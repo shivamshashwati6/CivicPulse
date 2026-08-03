@@ -1,16 +1,66 @@
-# React + Vite
+# CivicPulse AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> AI-Powered Civic Issue Reporting & Management Platform
 
-Currently, two official plugins are available:
+CivicPulse AI is a modern full-stack web application designed for citizens to report public infrastructure issues (such as potholes, broken streetlights, illegal garbage dumping, water leakage, and damaged roads) by capturing/uploading photos. The platform utilizes AI vision triage (powered by Google Gemini API) to classify, rate severity, and route reports to municipal administrative teams.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🛠️ Technology Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React 19, Vite, Tailwind CSS v4, React Router DOM v7, Lucide React Icons
+- **Backend & Database**: Supabase (Authentication, PostgreSQL Database, Storage)
+- **AI Triage Integration**: Prepared for Google Gemini Vision API
+- **Maps & Geolocation**: Prepared for Leaflet + OpenStreetMap integration
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## 📂 Project Architecture
+
+```text
+src/
+├── assets/                  # Media & graphic assets
+├── components/
+│   ├── common/              # LoadingSpinner, PageHeader
+│   ├── layout/              # Navbar, Footer, Layout
+│   └── ui/                  # Button, Card, Input, Badge primitives
+├── context/                 # AuthContext provider
+├── hooks/                   # useAuth, useIssues custom hooks
+├── pages/
+│   ├── Admin/               # Municipal administration view
+│   ├── Dashboard/           # Citizen overview dashboard
+│   ├── Landing/             # Platform landing page
+│   ├── Login/               # Auth login view
+│   ├── Report/              # Issue reporting photo form
+│   └── Track/               # Live issue tracking list
+├── routes/                  # AppRoutes React Router config
+├── services/                # Supabase client & API services
+└── utils/                   # Constants and utility functions
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Configure Environment Variables
+Create a `.env` file in the root directory:
+```env
+VITE_SUPABASE_URL=https://your-supabase-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+### 3. Run Development Server
+```bash
+npm run dev
+```
+
+---
+
+## 🔒 License
+
+MIT License. Built with ❤️ for civic empowerment.
