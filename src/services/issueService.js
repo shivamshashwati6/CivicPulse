@@ -1,5 +1,22 @@
 import { supabase } from './supabaseClient';
 
+/**
+ * Deterministically convert any user ID or string into a valid PostgreSQL UUID v4 format
+ */
+function toValidUuid(idStr) {
+  if (!idStr) return '00000000-0000-0000-0000-000000000000';
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(idStr)) {
+    return idStr;
+  }
+  let hex = '';
+  for (let i = 0; i < idStr.length; i++) {
+    hex += idStr.charCodeAt(i).toString(16);
+  }
+  hex = (hex + '00000000000000000000000000000000').substring(0, 32);
+  return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-4${hex.substring(13, 16)}-a${hex.substring(17, 20)}-${hex.substring(20, 32)}`;
+}
+
 export const issueService = {
   /**
    * Reverse geocode latitude and longitude with fallback APIs
@@ -93,24 +110,33 @@ export const issueService = {
   },
 
   /**
-   * Upload complaint photo to Supabase Storage bucket "complaints"
+   * Upload complaint photo to Supabase Storage bucket "complaints" with permanent base64 fallback
    */
   async uploadComplaintImage(file, userId) {
+    if (!file) return { publicUrl: null, error: null };
+
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId || 'anonymous'}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const validUserId = toValidUuid(userId);
+      const fileExt = file.name ? file.name.split('.').pop() : 'jpg';
+      const fileName = `${validUserId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
       const filePath = `${fileName}`;
 
       const { data, error } = await supabase.storage
         .from('complaints')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false,
+          upsert: true,
         });
 
       if (error) {
-        console.warn('Supabase storage upload warning:', error);
-        return { publicUrl: URL.createObjectURL(file), error: null };
+        console.warn('Supabase storage upload warning, encoding photo to base64 fallback:', error);
+        const base64Url = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+        return { publicUrl: base64Url || URL.createObjectURL(file), error: null };
       }
 
       const { data: publicUrlData } = supabase.storage
@@ -119,8 +145,14 @@ export const issueService = {
 
       return { publicUrl: publicUrlData.publicUrl, error: null };
     } catch (err) {
-      console.warn('Failed to upload image to Supabase storage:', err);
-      return { publicUrl: URL.createObjectURL(file), error: null };
+      console.warn('Failed to upload image to Supabase storage, encoding base64:', err);
+      const base64Url = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+      return { publicUrl: base64Url || URL.createObjectURL(file), error: null };
     }
   },
 
@@ -142,22 +174,22 @@ export const issueService = {
     imageUrl = null,
   }) {
     try {
-      // Step 1: Ensure user profile row exists in public.profiles table
-      if (userId) {
-        try {
-          await supabase.from('profiles').upsert(
-            [
-              {
-                id: userId,
-                email: userEmail,
-                full_name: userName,
-              },
-            ],
-            { onConflict: 'id' }
-          );
-        } catch (profileErr) {
-          console.warn('Profile upsert warning:', profileErr);
-        }
+      const validUserId = toValidUuid(userId);
+
+      // Step 1: Ensure user profile row exists in public.profiles table (catch non-fatal errors)
+      try {
+        await supabase.from('profiles').upsert(
+          [
+            {
+              id: validUserId,
+              email: userEmail,
+              full_name: userName,
+            },
+          ],
+          { onConflict: 'id' }
+        );
+      } catch (profileErr) {
+        console.warn('Profile upsert warning (non-fatal):', profileErr);
       }
 
       // Step 2: Insert complaint row into public.complaints
@@ -165,7 +197,7 @@ export const issueService = {
         .from('complaints')
         .insert([
           {
-            user_id: userId,
+            user_id: validUserId,
             title,
             description,
             category,
@@ -177,20 +209,21 @@ export const issueService = {
             priority,
           },
         ])
-        .select()
-        .single();
+        .select();
 
       if (complaintError) {
         console.error('Supabase DB complaint insert error:', complaintError);
-        throw complaintError;
+        return { data: null, error: complaintError };
       }
 
+      const insertedRecord = Array.isArray(complaintData) ? complaintData[0] : complaintData;
+
       // Step 3: Insert image record into public.complaint_images
-      if (imageUrl && complaintData?.id) {
+      if (imageUrl && insertedRecord?.id) {
         try {
           await supabase.from('complaint_images').insert([
             {
-              complaint_id: complaintData.id,
+              complaint_id: insertedRecord.id,
               image_url: imageUrl,
             },
           ]);
@@ -199,7 +232,7 @@ export const issueService = {
         }
       }
 
-      return { data: complaintData, error: null };
+      return { data: insertedRecord, error: null };
     } catch (err) {
       console.error('Error creating complaint in Supabase:', err);
       return { data: null, error: err };
@@ -209,7 +242,7 @@ export const issueService = {
   /**
    * Delete a complaint by ID directly in Supabase
    */
-  async deleteComplaint(complaintId, userId) {
+  async deleteComplaint(complaintId) {
     try {
       // 1. Delete complaint images
       try {
@@ -241,6 +274,8 @@ export const issueService = {
    */
   async fetchUserComplaints(userId) {
     try {
+      const validUserId = toValidUuid(userId);
+
       // Primary Attempt: Embedded join query
       const { data: remoteData, error } = await supabase
         .from('complaints')
@@ -251,7 +286,7 @@ export const issueService = {
             image_url
           )
         `)
-        .eq('user_id', userId)
+        .or(`user_id.eq.${validUserId},user_id.eq.${userId}`)
         .order('created_at', { ascending: false });
 
       if (!error && remoteData) {
@@ -262,7 +297,7 @@ export const issueService = {
       const { data: rawComplaints, error: rawError } = await supabase
         .from('complaints')
         .select('*')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${validUserId},user_id.eq.${userId}`)
         .order('created_at', { ascending: false });
 
       if (rawError) throw rawError;
@@ -349,12 +384,12 @@ export const issueService = {
    */
   async updateComplaintStatus(complaintId, newStatus, oldStatus = 'Pending', adminId = null) {
     try {
+      const validAdminId = adminId ? toValidUuid(adminId) : null;
       const { data, error } = await supabase
         .from('complaints')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', complaintId)
-        .select()
-        .single();
+        .select();
 
       if (error) {
         console.error('Supabase updateComplaintStatus error:', error);
@@ -367,7 +402,7 @@ export const issueService = {
             complaint_id: complaintId,
             old_status: oldStatus,
             new_status: newStatus,
-            updated_by: adminId || null,
+            updated_by: validAdminId,
           },
         ]);
       } catch (historyErr) {

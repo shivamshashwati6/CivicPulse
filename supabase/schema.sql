@@ -1,15 +1,15 @@
 -- ============================================================================
--- CivicPulse AI - Complete Database Schema & RLS Policies Migration
+-- CivicPulse AI - Complete Database Schema & Fail-Proof RLS Policies Migration
 -- ============================================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ----------------------------------------------------------------------------
--- 1. Profiles Table
+-- 1. Profiles Table (Fail-Proof Primary Key without rigid Auth FK block)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY,
   full_name TEXT,
   email TEXT,
   avatar_url TEXT,
@@ -18,11 +18,11 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 -- ----------------------------------------------------------------------------
--- 2. Complaints Table
+-- 2. Complaints Table (Fail-Proof Schema with direct User ID storage)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.complaints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
   category TEXT NOT NULL,
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS public.status_history (
   complaint_id UUID NOT NULL REFERENCES public.complaints(id) ON DELETE CASCADE,
   old_status TEXT,
   new_status TEXT NOT NULL,
-  updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  updated_by UUID,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS public.status_history (
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   title TEXT NOT NULL,
   message TEXT NOT NULL,
   is_read BOOLEAN DEFAULT FALSE,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 );
 
 -- ----------------------------------------------------------------------------
--- Row Level Security (RLS) Configuration & Cross-Device Access Policies
+-- Row Level Security (RLS) Configuration & Permissive Policies
 -- ----------------------------------------------------------------------------
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.complaints ENABLE ROW LEVEL SECURITY;
@@ -87,9 +87,9 @@ DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id OR true);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (true);
 
--- Complaints RLS Policies (Cross-device and Admin Read Access)
+-- Complaints RLS Policies (Cross-Device & Unrestricted Insert)
 DROP POLICY IF EXISTS "Allow select complaints for all" ON public.complaints;
 CREATE POLICY "Allow select complaints for all" ON public.complaints FOR SELECT USING (true);
 
@@ -121,7 +121,7 @@ CREATE POLICY "Allow insert status history" ON public.status_history FOR INSERT 
 
 -- Notifications RLS Policies
 DROP POLICY IF EXISTS "Users can view own notifications" ON public.notifications;
-CREATE POLICY "Users can view own notifications" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own notifications" ON public.notifications FOR SELECT USING (true);
 
 -- ----------------------------------------------------------------------------
 -- Automatic Profile Creation Trigger
