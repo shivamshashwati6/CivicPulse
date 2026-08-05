@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Menu, X, PlusCircle, LogIn, LogOut, LayoutDashboard, User } from 'lucide-react';
+import { Activity, Menu, X, PlusCircle, LogOut, LayoutDashboard, User, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -9,7 +9,7 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const toast = useToast();
 
   const toggleMenu = () => setIsOpen(!isOpen);
@@ -78,6 +78,7 @@ export function Navbar() {
                 {item.name}
               </a>
             ))}
+            
             {user && (
               <Link
                 to="/dashboard"
@@ -87,6 +88,14 @@ export function Navbar() {
                 Dashboard
               </Link>
             )}
+
+            <Link
+              to={isAdmin ? '/admin' : '/admin/login'}
+              className="text-sm font-semibold text-slate-700 hover:text-blue-600 transition-colors flex items-center gap-1.5"
+            >
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              Admin Portal
+            </Link>
           </nav>
 
           {/* Action Buttons */}
@@ -108,15 +117,15 @@ export function Navbar() {
               </div>
             ) : (
               <Link to="/login">
-                <Button variant="outline" className="text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-blue-600">
-                  <LogIn className="w-4 h-4 mr-2 text-gray-500" />
-                  Sign In
+                <Button variant="outline" className="text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-blue-600 font-medium">
+                  <User className="w-4 h-4 mr-2 text-gray-500" />
+                  Citizen Login
                 </Button>
               </Link>
             )}
 
             <Link to="/report">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md shadow-blue-600/20">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md shadow-blue-600/20">
                 <PlusCircle className="w-4 h-4 mr-2" />
                 Report Issue
               </Button>
@@ -168,6 +177,15 @@ export function Navbar() {
             </Link>
           )}
 
+          <Link
+            to={isAdmin ? '/admin' : '/admin/login'}
+            onClick={() => setIsOpen(false)}
+            className="block px-3 py-2 text-base font-medium text-slate-800 hover:text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-2"
+          >
+            <ShieldCheck className="w-4 h-4 text-blue-600" />
+            Admin Portal
+          </Link>
+
           <div className="pt-3 border-t border-gray-100 flex flex-col gap-2.5">
             {user ? (
               <>
@@ -186,14 +204,14 @@ export function Navbar() {
             ) : (
               <Link to="/login" onClick={() => setIsOpen(false)}>
                 <Button variant="outline" className="w-full justify-center text-gray-700 border-gray-200">
-                  <LogIn className="w-4 h-4 mr-2 text-gray-500" />
-                  Sign In
+                  <User className="w-4 h-4 mr-2 text-gray-500" />
+                  Citizen Login
                 </Button>
               </Link>
             )}
 
             <Link to="/report" onClick={() => setIsOpen(false)}>
-              <Button className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700">
+              <Button className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700 font-semibold">
                 <PlusCircle className="w-4 h-4 mr-2" />
                 Report Issue
               </Button>

@@ -12,14 +12,12 @@ import {
   Layers,
   ShieldCheck,
   ArrowRight,
-  ChevronRight,
   Mail,
   Phone,
   Building2,
-  MessageSquare,
   Activity,
   Users,
-  Check
+  PlusCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { PhoneMockup } from './PhoneMockup';
@@ -115,7 +113,7 @@ export function LandingPage() {
     <div className="space-y-24 pb-20">
       
       {/* ------------------------------------------------------------- */}
-      {/* 2. HERO SECTION                                               */}
+      {/* HERO SECTION                                                  */}
       {/* ------------------------------------------------------------- */}
       <section id="home" className="relative pt-12 lg:pt-20 pb-8 overflow-hidden bg-gradient-to-b from-blue-50/40 via-white to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -140,15 +138,18 @@ export function LandingPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
                 <Link to="/report" className="w-full sm:w-auto">
                   <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-blue-600/25 transition-all">
+                    <PlusCircle className="w-5 h-5 mr-2" />
                     Report Issue
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </Link>
-                <a href="#how-it-works" className="w-full sm:w-auto">
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto text-gray-700 border-gray-300 hover:bg-gray-50 px-8 py-3.5 rounded-xl font-medium">
-                    Learn More
+
+                <Link to="/admin/login" className="w-full sm:w-auto">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto text-slate-800 border-slate-300 hover:bg-slate-100 px-6 py-3.5 rounded-xl font-semibold flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5 mr-2 text-blue-600" />
+                    Admin Portal Login
                   </Button>
-                </a>
+                </Link>
               </div>
 
               {/* Trust Badge Bar */}
@@ -169,7 +170,7 @@ export function LandingPage() {
             </div>
 
             {/* Right Column Phone Mockup */}
-            <div className="lg:col-span-5 flex justify-center">
+            <div className="lg:col-span-5 flex justify-center lg:justify-end">
               <PhoneMockup />
             </div>
 
@@ -178,189 +179,167 @@ export function LandingPage() {
       </section>
 
       {/* ------------------------------------------------------------- */}
-      {/* 3. STATISTICS SECTION                                         */}
+      {/* STATS STRIP                                                   */}
       {/* ------------------------------------------------------------- */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, idx) => {
-            const Icon = stat.icon;
-            return (
-              <div
-                key={idx}
-                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    {stat.label}
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-3xl font-extrabold text-gray-900 tracking-tight">{stat.value}</h3>
-                  <p className="text-xs text-emerald-600 font-medium">{stat.change}</p>
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 bg-slate-900 rounded-3xl p-8 sm:p-10 text-white shadow-xl">
+          {stats.map((stat, i) => (
+            <div key={i} className="space-y-2 border-b sm:border-b-0 sm:border-r border-slate-800 last:border-0 pb-6 sm:pb-0 pr-0 sm:pr-6">
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="text-xs font-semibold uppercase tracking-wider">{stat.label}</span>
+                <stat.icon className="w-5 h-5 text-blue-400" />
               </div>
-            );
-          })}
+              <p className="text-3xl font-extrabold text-white tracking-tight">{stat.value}</p>
+              <p className="text-xs font-medium text-emerald-400">{stat.change}</p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* ------------------------------------------------------------- */}
-      {/* 4. FEATURES PREVIEW                                           */}
+      {/* FEATURES SECTION                                              */}
       {/* ------------------------------------------------------------- */}
-      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
-            Features Overview
+      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
+            <BrainCircuit className="w-3.5 h-3.5 text-blue-600" />
+            <span>Platform Capabilities</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
-            Intelligent Infrastructure Technology
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+            Engineered for High-Impact Municipal Efficiency
           </h2>
-          <p className="text-gray-600 text-base leading-relaxed">
-            Built from the ground up for speed, transparency, and high municipal throughput.
+          <p className="text-base text-gray-600 leading-relaxed">
+            From automated AI triage to OpenStreetMap GIS map visualization, CivicPulse AI streamlines the complete lifecycle of municipal maintenance.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {features.map((feat, idx) => {
-            const Icon = feat.icon;
-            return (
-              <div
-                key={idx}
-                className="bg-white rounded-2xl p-8 border border-gray-100 shadow-xs hover:shadow-md hover:border-blue-200 transition-all group space-y-4"
-              >
-                <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <Icon className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">{feat.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{feat.description}</p>
+          {features.map((feature, i) => (
+            <div
+              key={i}
+              className="p-8 bg-white rounded-2xl border border-gray-200/80 shadow-2xs hover:shadow-md transition-all hover:-translate-y-1 space-y-4"
+            >
+              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <feature.icon className="w-6 h-6" />
               </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------- */}
-      {/* 5. HOW IT WORKS                                               */}
-      {/* ------------------------------------------------------------- */}
-      <section id="how-it-works" className="bg-gray-50/70 py-16 border-y border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="text-center max-w-2xl mx-auto space-y-3">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/60 text-blue-700 text-xs font-semibold">
-              Simple Workflow
+              <h3 className="text-xl font-bold text-gray-900">{feature.title}</h3>
+              <p className="text-sm text-gray-600 leading-relaxed font-normal">{feature.description}</p>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
-              How CivicPulse AI Works
-            </h2>
-            <p className="text-gray-600 text-base">
-              From photo capture to resolved public infrastructure in 4 transparent steps.
-            </p>
-          </div>
-
-          {/* 4-Step Horizontal Process Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative">
-            {steps.map((item, idx) => {
-              const Icon = item.icon;
-              return (
-                <div key={idx} className="relative bg-white rounded-2xl p-6 border border-gray-200/80 shadow-2xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
-                      STEP {item.step}
-                    </span>
-                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
-                      <Icon className="w-5 h-5" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
-                    <p className="text-xs text-gray-600 leading-relaxed">{item.description}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
+          ))}
         </div>
       </section>
 
       {/* ------------------------------------------------------------- */}
-      {/* 6. CONTACT SECTION                                            */}
+      {/* HOW IT WORKS SECTION                                          */}
       {/* ------------------------------------------------------------- */}
-      <section id="contact" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        <div className="text-center max-w-2xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
-            Get In Touch
+      <section id="how-it-works" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
+            <Clock className="w-3.5 h-3.5 text-blue-600" />
+            <span>Simple 4-Step Workflow</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
-            Contact Municipal Support & Engineering
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+            How CivicPulse AI Resolves Infrastructure Issues
           </h2>
-          <p className="text-gray-600 text-base">
-            Have questions about deploying CivicPulse AI in your district or evaluating our API?
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {steps.map((step, i) => (
+            <div key={i} className="relative p-6 bg-gray-50 rounded-2xl border border-gray-200/60 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-3xl font-extrabold text-blue-600">{step.step}</span>
+                <div className="w-10 h-10 rounded-xl bg-white text-blue-600 shadow-2xs flex items-center justify-center">
+                  <step.icon className="w-5 h-5" />
+                </div>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">{step.title}</h3>
+              <p className="text-xs text-gray-600 leading-relaxed">{step.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------- */}
+      {/* CONTACT SECTION                                               */}
+      {/* ------------------------------------------------------------- */}
+      <section id="contact" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 bg-slate-900 text-white rounded-3xl p-8 sm:p-12 shadow-xl">
           
-          {/* Left Column: Contact Cards */}
+          {/* Left Column: Contact Details */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl p-8 space-y-6 shadow-lg shadow-blue-600/20">
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold">Hackathon & Municipal Inquiries</h3>
-                <p className="text-xs text-blue-100 leading-relaxed">
-                  Our architecture is built for rapid integration with municipal GIS systems and open civic data APIs.
-                </p>
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-900/60 text-blue-300 text-xs font-semibold border border-blue-700/50">
+                <Mail className="w-3.5 h-3.5 text-blue-400" />
+                <span>Municipal Relations</span>
               </div>
+              <h2 className="text-3xl font-extrabold text-white tracking-tight">
+                Deploy CivicPulse AI in Your Municipality
+              </h2>
+              <p className="text-sm text-slate-300 leading-relaxed font-normal">
+                Interested in deploying CivicPulse AI for your city or public works department? Contact our team for institutional onboarding.
+              </p>
+            </div>
 
-              <div className="space-y-4 text-xs font-medium pt-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/30 flex items-center justify-center">
-                    <Mail className="w-4 h-4 text-white" />
-                  </div>
-                  <span>support@civicpulse.ai</span>
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-800 text-blue-400 flex items-center justify-center">
+                  <Mail className="w-4 h-4" />
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/30 flex items-center justify-center">
-                    <Phone className="w-4 h-4 text-white" />
-                  </div>
-                  <span>+1 (800) 555-CIVIC</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/30 flex items-center justify-center">
-                    <Building2 className="w-4 h-4 text-white" />
-                  </div>
-                  <span>City Center Municipal Hub, Suite 400</span>
+                <div>
+                  <p className="text-xs text-slate-400">Institutional Email</p>
+                  <p className="text-sm font-semibold text-white">support@civicpulse.ai</p>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-blue-500/40 text-xs text-blue-100 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-300" />
-                <span>24/7 SLA Response Guarantee</span>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-800 text-blue-400 flex items-center justify-center">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Emergency & Support</p>
+                  <p className="text-sm font-semibold text-white">+1 (800) 555-CIVIC</p>
+                </div>
               </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-800 text-blue-400 flex items-center justify-center">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Headquarters</p>
+                  <p className="text-sm font-semibold text-white">100 Innovation Way, Suite 400</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Link to Admin Login */}
+            <div className="pt-4 border-t border-slate-800">
+              <Link to="/admin/login" className="inline-flex items-center gap-2 text-xs font-semibold text-blue-400 hover:text-blue-300 hover:underline">
+                <ShieldCheck className="w-4 h-4" />
+                Municipal Authority Portal Sign In →
+              </Link>
             </div>
           </div>
 
-          {/* Right Column: Interactive Form */}
-          <div className="lg:col-span-7 bg-white rounded-2xl border border-gray-200 p-8 shadow-xs">
+          {/* Right Column: Contact Form */}
+          <div className="lg:col-span-7 bg-white text-gray-900 rounded-2xl p-6 sm:p-8">
             {contactSubmitted ? (
               <div className="py-12 text-center space-y-3">
                 <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
-                  <Check className="w-7 h-7" />
+                  <CheckCircle2 className="w-8 h-8" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">Message Sent Successfully!</h3>
-                <p className="text-sm text-gray-600 max-w-sm mx-auto">
-                  Thank you for reaching out. Our municipal engineering support team will respond shortly.
+                <h3 className="text-xl font-bold text-gray-900">Message Received!</h3>
+                <p className="text-xs text-gray-600 max-w-sm mx-auto">
+                  Thank you for reaching out. Our municipal onboarding team will contact you within 24 hours.
                 </p>
               </div>
             ) : (
               <form onSubmit={handleContactSubmit} className="space-y-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Send us a Message</h3>
-                
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Send an Inquiry</h3>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-700">Your Name</label>
+                    <label className="block text-xs font-semibold text-gray-700">Your Name *</label>
                     <input
                       type="text"
                       required
@@ -372,11 +351,11 @@ export function LandingPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-700">Email Address</label>
+                    <label className="block text-xs font-semibold text-gray-700">Official Email *</label>
                     <input
                       type="email"
                       required
-                      placeholder="jane@citydomain.gov"
+                      placeholder="jane@city.gov"
                       value={contactForm.email}
                       onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
                       className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -396,7 +375,7 @@ export function LandingPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-gray-700">Message</label>
+                  <label className="block text-xs font-semibold text-gray-700">Message *</label>
                   <textarea
                     rows={4}
                     required
