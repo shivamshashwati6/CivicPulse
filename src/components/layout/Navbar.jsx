@@ -1,13 +1,29 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Activity, Menu, X, PlusCircle, LogIn } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Activity, Menu, X, PlusCircle, LogIn, LogOut, LayoutDashboard, User } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const toast = useToast();
 
   const toggleMenu = () => setIsOpen(!isOpen);
+
+  const handleLogout = async () => {
+    setIsOpen(false);
+    const { error } = await logout();
+    if (error) {
+      toast.error(error.message || 'Logout failed.');
+    } else {
+      toast.success('Logged out successfully.');
+      navigate('/');
+    }
+  };
 
   const navItems = [
     { name: 'Home', href: '/' },
@@ -62,16 +78,43 @@ export function Navbar() {
                 {item.name}
               </a>
             ))}
+            {user && (
+              <Link
+                to="/dashboard"
+                className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1.5"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </Link>
+            )}
           </nav>
 
           {/* Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Link to="/login">
-              <Button variant="outline" className="text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-blue-600">
-                <LogIn className="w-4 h-4 mr-2 text-gray-500" />
-                Sign In
-              </Button>
-            </Link>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200/80 text-xs font-medium text-gray-700">
+                  <User className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="max-w-[140px] truncate">{user.user_metadata?.full_name || user.email}</span>
+                </div>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-rose-600"
+                >
+                  <LogOut className="w-4 h-4 mr-2 text-gray-500 hover:text-rose-600" />
+                  Logout
+                </Button>
+              </div>
+            ) : (
+              <Link to="/login">
+                <Button variant="outline" className="text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-blue-600">
+                  <LogIn className="w-4 h-4 mr-2 text-gray-500" />
+                  Sign In
+                </Button>
+              </Link>
+            )}
+
             <Link to="/report">
               <Button className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md shadow-blue-600/20">
                 <PlusCircle className="w-4 h-4 mr-2" />
@@ -114,13 +157,41 @@ export function Navbar() {
               {item.name}
             </a>
           ))}
-          <div className="pt-3 border-t border-gray-100 flex flex-col gap-2.5">
-            <Link to="/login" onClick={() => setIsOpen(false)}>
-              <Button variant="outline" className="w-full justify-center text-gray-700 border-gray-200">
-                <LogIn className="w-4 h-4 mr-2 text-gray-500" />
-                Sign In
-              </Button>
+
+          {user && (
+            <Link
+              to="/dashboard"
+              onClick={() => setIsOpen(false)}
+              className="block px-3 py-2 text-base font-medium text-blue-600 hover:bg-blue-50 rounded-lg"
+            >
+              Dashboard
             </Link>
+          )}
+
+          <div className="pt-3 border-t border-gray-100 flex flex-col gap-2.5">
+            {user ? (
+              <>
+                <div className="px-3 py-1.5 text-xs text-gray-500 font-medium truncate">
+                  Logged in as <span className="font-semibold text-gray-800">{user.email}</span>
+                </div>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="w-full justify-center text-gray-700 border-gray-200"
+                >
+                  <LogOut className="w-4 h-4 mr-2 text-rose-500" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Link to="/login" onClick={() => setIsOpen(false)}>
+                <Button variant="outline" className="w-full justify-center text-gray-700 border-gray-200">
+                  <LogIn className="w-4 h-4 mr-2 text-gray-500" />
+                  Sign In
+                </Button>
+              </Link>
+            )}
+
             <Link to="/report" onClick={() => setIsOpen(false)}>
               <Button className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700">
                 <PlusCircle className="w-4 h-4 mr-2" />
