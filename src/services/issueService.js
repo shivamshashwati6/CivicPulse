@@ -1,60 +1,5 @@
 import { supabase } from './supabaseClient';
 
-const LOCAL_STORAGE_KEY = 'civicpulse_user_complaints';
-
-function getLocalComplaints(userId = null) {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    if (userId) {
-      return parsed.filter((c) => c.user_id === userId);
-    }
-    return parsed;
-  } catch (e) {
-    console.warn('Error reading local complaints:', e);
-    return [];
-  }
-}
-
-function saveLocalComplaint(complaint) {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    const existing = raw ? JSON.parse(raw) : [];
-    const updated = [complaint, ...existing.filter((c) => c.id !== complaint.id)];
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Error saving local complaint:', e);
-  }
-}
-
-function removeLocalComplaint(complaintId) {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return;
-    const existing = JSON.parse(raw);
-    const updated = existing.filter((c) => c.id !== complaintId);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Error removing local complaint:', e);
-  }
-}
-
-function updateLocalComplaintStatus(complaintId, newStatus) {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return;
-    const existing = JSON.parse(raw);
-    const updated = existing.map((c) =>
-      c.id === complaintId ? { ...c, status: newStatus, updated_at: new Date().toISOString() } : c
-    );
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Error updating local complaint status:', e);
-  }
-}
-
 export const issueService = {
   /**
    * Reverse geocode latitude and longitude with fallback APIs
@@ -164,7 +109,7 @@ export const issueService = {
         });
 
       if (error) {
-        console.warn('Supabase storage upload failed, using local object URL fallback:', error);
+        console.warn('Supabase storage upload warning:', error);
         return { publicUrl: URL.createObjectURL(file), error: null };
       }
 
@@ -174,13 +119,13 @@ export const issueService = {
 
       return { publicUrl: publicUrlData.publicUrl, error: null };
     } catch (err) {
-      console.warn('Failed to upload image to Supabase storage, using fallback:', err);
+      console.warn('Failed to upload image to Supabase storage:', err);
       return { publicUrl: URL.createObjectURL(file), error: null };
     }
   },
 
   /**
-   * Create a new complaint record with Supabase + localStorage persistence
+   * Create a new complaint record directly in Supabase PostgreSQL DB
    */
   async createIssue({
     userId,
@@ -196,26 +141,8 @@ export const issueService = {
     priority = 'Medium',
     imageUrl = null,
   }) {
-    const complaintId = crypto.randomUUID ? crypto.randomUUID() : `cmp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const newComplaintObject = {
-      id: complaintId,
-      user_id: userId,
-      title,
-      description,
-      category,
-      severity,
-      latitude,
-      longitude,
-      address,
-      status: 'Pending',
-      priority,
-      created_at: new Date().toISOString(),
-      complaint_images: imageUrl ? [{ id: `img_${Date.now()}`, image_url: imageUrl }] : [],
-    };
-
-    saveLocalComplaint(newComplaintObject);
-
     try {
+      // Step 1: Ensure user profile row exists in public.profiles table
       if (userId) {
         try {
           await supabase.from('profiles').upsert(
@@ -233,11 +160,11 @@ export const issueService = {
         }
       }
 
+      // Step 2: Insert complaint row into public.complaints
       const { data: complaintData, error: complaintError } = await supabase
         .from('complaints')
         .insert([
           {
-            id: complaintId,
             user_id: userId,
             title,
             description,
@@ -254,14 +181,16 @@ export const issueService = {
         .single();
 
       if (complaintError) {
-        console.warn('Supabase DB insert warning (saved locally):', complaintError);
+        console.error('Supabase DB complaint insert error:', complaintError);
+        throw complaintError;
       }
 
-      if (imageUrl && (complaintData?.id || complaintId)) {
+      // Step 3: Insert image record into public.complaint_images
+      if (imageUrl && complaintData?.id) {
         try {
           await supabase.from('complaint_images').insert([
             {
-              complaint_id: complaintData?.id || complaintId,
+              complaint_id: complaintData.id,
               image_url: imageUrl,
             },
           ]);
@@ -270,53 +199,49 @@ export const issueService = {
         }
       }
 
-      return { data: complaintData || newComplaintObject, error: null };
+      return { data: complaintData, error: null };
     } catch (err) {
-      console.warn('Supabase createIssue network warning (saved locally):', err);
-      return { data: newComplaintObject, error: null };
+      console.error('Error creating complaint in Supabase:', err);
+      return { data: null, error: err };
     }
   },
 
   /**
-   * Delete a complaint by ID (Removes from Supabase DB + Local Storage)
+   * Delete a complaint by ID directly in Supabase
    */
   async deleteComplaint(complaintId, userId) {
-    // 1. Remove from local storage cache immediately
-    removeLocalComplaint(complaintId);
-
     try {
-      // 2. Delete complaint images if any
+      // 1. Delete complaint images
       try {
         await supabase.from('complaint_images').delete().eq('complaint_id', complaintId);
       } catch (imgErr) {
         console.warn('Complaint images delete warning:', imgErr);
       }
 
-      // 3. Delete complaint record from Supabase complaints table
+      // 2. Delete complaint record from Supabase complaints table
       const { error } = await supabase
         .from('complaints')
         .delete()
-        .eq('id', complaintId)
-        .eq('user_id', userId);
+        .eq('id', complaintId);
 
       if (error) {
-        console.warn('Supabase delete complaint error (removed locally):', error);
+        console.error('Supabase delete complaint error:', error);
+        return { error };
       }
 
       return { error: null };
     } catch (err) {
-      console.warn('Supabase deleteComplaint network warning (removed locally):', err);
-      return { error: null };
+      console.error('Supabase deleteComplaint exception:', err);
+      return { error: err };
     }
   },
 
   /**
-   * Fetch user complaints (Combines Supabase DB + Local Storage)
+   * Fetch user complaints directly from Supabase DB
    */
   async fetchUserComplaints(userId) {
-    const localComplaints = getLocalComplaints(userId);
-
     try {
+      // Primary Attempt: Embedded join query
       const { data: remoteData, error } = await supabase
         .from('complaints')
         .select(`
@@ -330,21 +255,17 @@ export const issueService = {
         .order('created_at', { ascending: false });
 
       if (!error && remoteData) {
-        const map = new Map();
-        [...remoteData, ...localComplaints].forEach((item) => {
-          map.set(item.id, item);
-        });
-        const combined = Array.from(map.values()).sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-        return { data: combined, error: null };
+        return { data: remoteData, error: null };
       }
 
-      const { data: rawComplaints } = await supabase
+      // Fallback Attempt: Direct query without join
+      const { data: rawComplaints, error: rawError } = await supabase
         .from('complaints')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
+
+      if (rawError) throw rawError;
 
       if (rawComplaints && rawComplaints.length > 0) {
         const complaintIds = rawComplaints.map((c) => c.id);
@@ -358,28 +279,20 @@ export const issueService = {
           complaint_images: images?.filter((img) => img.complaint_id === c.id) || [],
         }));
 
-        const map = new Map();
-        [...complaintsWithImages, ...localComplaints].forEach((item) => {
-          map.set(item.id, item);
-        });
-        const combined = Array.from(map.values()).sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-        return { data: combined, error: null };
+        return { data: complaintsWithImages, error: null };
       }
-    } catch (err) {
-      console.warn('Supabase fetch error, returning local complaints:', err);
-    }
 
-    return { data: localComplaints, error: null };
+      return { data: rawComplaints || [], error: null };
+    } catch (err) {
+      console.error('Error fetching user complaints from Supabase:', err);
+      return { data: [], error: err };
+    }
   },
 
   /**
-   * Fetch ALL system complaints for Admin Control Panel Dashboard
+   * Fetch ALL system complaints directly from Supabase DB for Admin Control Panel
    */
   async fetchAllComplaints() {
-    const localComplaints = getLocalComplaints(null);
-
     try {
       const { data: remoteData, error } = await supabase
         .from('complaints')
@@ -398,20 +311,16 @@ export const issueService = {
         .order('created_at', { ascending: false });
 
       if (!error && remoteData) {
-        const map = new Map();
-        [...remoteData, ...localComplaints].forEach((item) => {
-          map.set(item.id, item);
-        });
-        const combined = Array.from(map.values()).sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-        return { data: combined, error: null };
+        return { data: remoteData, error: null };
       }
 
-      const { data: rawComplaints } = await supabase
+      // Fallback query without embedded profiles join
+      const { data: rawComplaints, error: rawError } = await supabase
         .from('complaints')
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (rawError) throw rawError;
 
       if (rawComplaints && rawComplaints.length > 0) {
         const complaintIds = rawComplaints.map((c) => c.id);
@@ -425,35 +334,32 @@ export const issueService = {
           complaint_images: images?.filter((img) => img.complaint_id === c.id) || [],
         }));
 
-        const map = new Map();
-        [...complaintsWithImages, ...localComplaints].forEach((item) => {
-          map.set(item.id, item);
-        });
-        const combined = Array.from(map.values()).sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-        return { data: combined, error: null };
+        return { data: complaintsWithImages, error: null };
       }
-    } catch (err) {
-      console.warn('Supabase fetchAllComplaints error, using local fallback:', err);
-    }
 
-    return { data: localComplaints, error: null };
+      return { data: rawComplaints || [], error: null };
+    } catch (err) {
+      console.error('Error fetching all complaints from Supabase:', err);
+      return { data: [], error: err };
+    }
   },
 
   /**
-   * Update complaint status from Admin Control Panel
+   * Update complaint status directly in Supabase DB
    */
   async updateComplaintStatus(complaintId, newStatus, oldStatus = 'Pending', adminId = null) {
-    updateLocalComplaintStatus(complaintId, newStatus);
-
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('complaints')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', complaintId)
         .select()
         .single();
+
+      if (error) {
+        console.error('Supabase updateComplaintStatus error:', error);
+        return { data: null, error };
+      }
 
       try {
         await supabase.from('status_history').insert([
@@ -468,10 +374,10 @@ export const issueService = {
         console.warn('Status history insert warning:', historyErr);
       }
 
-      return { data: data || { id: complaintId, status: newStatus }, error: null };
+      return { data, error: null };
     } catch (err) {
-      console.warn('Supabase updateComplaintStatus network warning (updated locally):', err);
-      return { data: { id: complaintId, status: newStatus }, error: null };
+      console.error('Supabase updateComplaintStatus exception:', err);
+      return { data: null, error: err };
     }
   },
 

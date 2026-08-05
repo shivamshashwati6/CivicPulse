@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, Users, AlertOctagon, RefreshCw, CheckCircle2, Clock, MapPin, Tag, Calendar, User, Search, Layers, Loader2, LogOut } from 'lucide-react';
+import { ShieldAlert, Users, AlertOctagon, RefreshCw, CheckCircle2, Clock, MapPin, Tag, Calendar, User, Search, Layers, Loader2, LogOut, Radio } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { ISSUE_CATEGORIES } from '../../utils/constants';
 import { issueService } from '../../services/issueService';
+import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 
@@ -22,6 +23,7 @@ export function AdminPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   const loadAdminQueue = useCallback(async () => {
     setLoading(true);
@@ -30,8 +32,29 @@ export function AdminPage() {
     setLoading(false);
   }, []);
 
+  // Supabase Realtime Subscription for automatic multi-device updates
   useEffect(() => {
     loadAdminQueue();
+
+    const channel = supabase
+      .channel('admin-realtime-complaints')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'complaints' },
+        (payload) => {
+          console.log('Supabase Realtime complaint change received:', payload);
+          loadAdminQueue();
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setRealtimeConnected(true);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [loadAdminQueue]);
 
   const handleAdminLogout = () => {
@@ -123,7 +146,16 @@ export function AdminPage() {
       <PageHeader
         title="Municipal Administration Control Panel"
         description="Review incoming AI-analyzed reports across all districts, dispatch field teams, and manage resolution statuses."
-        badge={<Badge variant="indigo">Admin Authority View</Badge>}
+        badge={
+          <div className="flex items-center gap-2">
+            <Badge variant="indigo">Admin Authority View</Badge>
+            {realtimeConnected && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold tracking-wide border border-emerald-200">
+                <Radio className="w-3 h-3 text-emerald-600 animate-pulse" /> Live Realtime Sync
+              </span>
+            )}
+          </div>
+        }
         action={
           <div className="flex items-center gap-2">
             <Button
