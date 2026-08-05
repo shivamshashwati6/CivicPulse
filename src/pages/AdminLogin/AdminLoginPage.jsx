@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShieldCheck, KeyRound, Mail, Lock, ArrowRight, Loader2, Sparkles, Building2 } from 'lucide-react';
+import { ShieldCheck, KeyRound, Mail, Lock, ArrowRight, Loader2, Building2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -120,21 +120,13 @@ export function AdminLoginPage() {
                 <div className="relative">
                   <Input
                     type="password"
-                    placeholder="Enter admin passcode (e.g. ADMIN123)"
+                    placeholder="Enter municipal security passcode"
                     value={passcode}
                     onChange={(e) => setPasscode(e.target.value)}
                     required
                     className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 pl-10 focus:border-blue-500 text-sm"
                   />
                   <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-3 pointer-events-none" />
-                </div>
-
-                <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-800/40 text-blue-300 text-xs space-y-1">
-                  <div className="flex items-center gap-1.5 font-semibold">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                    Demo Admin Key:
-                  </div>
-                  <p className="font-mono text-[11px] text-blue-200">Passcode: <code className="bg-blue-900/80 px-1.5 py-0.5 rounded text-white font-bold">ADMIN123</code></p>
                 </div>
               </div>
             ) : (
