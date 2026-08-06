@@ -107,6 +107,32 @@ export const issueService = {
   },
 
   /**
+   * Geocode a text search query string into latitude, longitude, and formatted address
+   */
+  async geocodeAddress(searchQuery) {
+    if (!searchQuery || !searchQuery.trim()) return null;
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery.trim())}&limit=1`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.length > 0) {
+          const item = data[0];
+          return {
+            latitude: parseFloat(item.lat),
+            longitude: parseFloat(item.lon),
+            address: item.display_name || searchQuery.trim(),
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Nominatim geocode query error:', err);
+    }
+    return null;
+  },
+
+  /**
    * Fast IP-based Location Fetcher (Fallback for PCs without GPS hardware or blocked permissions)
    */
   async fetchIpLocation() {
@@ -299,7 +325,6 @@ export const issueService = {
         complaint_images: imageUrl ? [{ id: `img_${Date.now()}`, image_url: imageUrl }] : [],
       };
 
-      // Do NOT call saveLocalComplaint when database insert succeeds to avoid duplicating DB rows with local state
       return { data: finalComplaintObj, error: null };
     } catch (err) {
       console.warn('Network exception during createIssue (Failed to fetch), using resilient local queue:', err);
@@ -352,7 +377,6 @@ export const issueService = {
         .order('created_at', { ascending: false });
 
       if (!error && remoteData) {
-        // Deduplicate by complaint ID
         const map = new Map();
         remoteData.forEach((item) => {
           if (item && item.id && !map.has(item.id)) {
@@ -393,7 +417,6 @@ export const issueService = {
         .order('created_at', { ascending: false });
 
       if (!error && remoteData) {
-        // Deduplicate by complaint ID
         const map = new Map();
         remoteData.forEach((item) => {
           if (item && item.id && !map.has(item.id)) {

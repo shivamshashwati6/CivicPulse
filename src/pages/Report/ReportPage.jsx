@@ -293,8 +293,11 @@ export function ReportPage() {
           </div>
 
           <LocationPicker
+            latitude={locationData.latitude}
+            longitude={locationData.longitude}
+            address={locationData.address}
+            onChange={(loc) => setLocationData(loc)}
             onLocationSelect={(loc) => setLocationData(loc)}
-            initialAddress={locationData.address}
           />
         </Card>
 
