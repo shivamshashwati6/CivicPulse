@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Activity, Menu, X, PlusCircle, LogOut, LayoutDashboard, User, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { ThemeToggle } from '../common/ThemeToggle';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 
@@ -9,20 +10,34 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, adminLogout } = useAuth();
   const toast = useToast();
+
+  const currentPath = location.pathname;
+  const isLandingPage = currentPath === '/';
+
+  // Strict Role & View Isolation
+  const isAdminView = currentPath.startsWith('/admin') || isAdmin === true;
+  const isAuthenticated = (user !== null && user?.id !== undefined) || isAdmin === true;
+  const isCitizen = isAuthenticated && !isAdminView;
+
+  const displayName = isAdminView
+    ? (user?.email || user?.user_metadata?.full_name || 'Municipal Admin')
+    : (user?.user_metadata?.full_name || user?.email || 'Shashwati Shivam');
 
   const toggleMenu = () => setIsOpen(!isOpen);
 
+  // Synchronized Unified Logout Handler
   const handleLogout = async () => {
     setIsOpen(false);
-    const { error } = await logout();
-    if (error) {
-      toast.error(error.message || 'Logout failed.');
-    } else {
-      toast.success('Logged out successfully.');
-      navigate('/');
+    if (isAdmin || currentPath.startsWith('/admin')) {
+      adminLogout();
     }
+    if (user) {
+      await logout();
+    }
+    toast.success('Logged out successfully.');
+    navigate('/');
   };
 
   const navItems = [
@@ -35,7 +50,7 @@ export function Navbar() {
   const handleNavClick = (href) => {
     setIsOpen(false);
     if (href.startsWith('#')) {
-      if (location.pathname !== '/') {
+      if (currentPath !== '/') {
         window.location.href = '/' + href;
         return;
       }
@@ -47,22 +62,23 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+    <header className="sticky top-0 z-50 px-4 sm:px-6 lg:px-8">
+      {/* Cyber-Tactical Pill-Shaped Glass Header */}
+      <div className="backdrop-blur-md bg-white/70 dark:bg-[#0f172a]/60 border border-slate-200/80 dark:border-slate-800/80 rounded-full my-3 mx-auto max-w-7xl px-6 shadow-lg shadow-slate-900/5 dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] transition-all duration-300">
+        <div className="flex items-center justify-between h-16">
           
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:bg-blue-700 transition-colors">
-              <Activity className="w-6 h-6" />
+          <Link to="/" className="flex items-center gap-2.5 group hover:scale-[1.02] transition-transform">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:bg-blue-700 transition-colors">
+              <Activity className="w-5 h-5" />
             </div>
-            <span className="text-xl font-bold text-gray-900 tracking-tight">
-              Civic<span className="text-blue-600">Pulse AI</span>
+            <span className="text-lg font-bold tracking-tight text-slate-900 dark:bg-gradient-to-r dark:from-white dark:via-slate-100 dark:to-slate-300 dark:bg-clip-text dark:text-transparent">
+              Civic<span className="text-blue-600 dark:text-blue-400">Pulse AI</span>
             </span>
           </Link>
 
-          {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8">
+          {/* Desktop Navigation Links */}
+          <nav className="hidden md:flex items-center gap-7">
             {navItems.map((item) => (
               <a
                 key={item.name}
@@ -73,74 +89,116 @@ export function Navbar() {
                     handleNavClick(item.href);
                   }
                 }}
-                className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+                className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
               >
                 {item.name}
               </a>
             ))}
             
-            {user && (
+            {/* Citizen Only: 'Dashboard' Link */}
+            {isCitizen && !isLandingPage && (
               <Link
                 to="/dashboard"
-                className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1.5"
+                className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors flex items-center gap-1.5"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
               </Link>
             )}
 
-            <Link
-              to={isAdmin ? '/admin' : '/admin/login'}
-              className="text-sm font-semibold text-slate-700 hover:text-blue-600 transition-colors flex items-center gap-1.5"
-            >
-              <ShieldCheck className="w-4 h-4 text-blue-600" />
-              Admin Portal
-            </Link>
+            {/* Admin Only: 'Admin Portal' Active Badge */}
+            {isAdminView && (
+              <Link
+                to="/admin"
+                className="text-xs font-semibold uppercase tracking-wider text-slate-800 dark:text-slate-100 hover:text-blue-600 transition-colors flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-[#1e293b]/60 rounded-full border border-slate-200/80 dark:border-slate-700/60"
+              >
+                <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                Admin Portal
+              </Link>
+            )}
           </nav>
 
-          {/* Action Buttons */}
+          {/* Desktop Action Buttons with Theme Toggle */}
           <div className="hidden md:flex items-center gap-3">
-            {user ? (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200/80 text-xs font-medium text-gray-700">
-                  <User className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="max-w-[140px] truncate">{user.user_metadata?.full_name || user.email}</span>
+            <ThemeToggle />
+
+            {isAdminView ? (
+              /* ADMIN VIEW */
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 dark:bg-[#1e293b]/80 border border-slate-800 dark:border-slate-700/80 text-xs font-bold text-white shadow-xs">
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="max-w-[140px] truncate">{displayName}</span>
+                  <span className="ml-1 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/30">
+                    Admin
+                  </span>
                 </div>
+
                 <Button
                   onClick={handleLogout}
                   variant="outline"
-                  className="text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-rose-600"
+                  size="sm"
+                  className="text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-[#1e293b]/80 hover:text-rose-600 font-medium rounded-full"
                 >
-                  <LogOut className="w-4 h-4 mr-2 text-gray-500 hover:text-rose-600" />
+                  <LogOut className="w-3.5 h-3.5 mr-1 text-slate-500 dark:text-slate-400" />
                   Logout
                 </Button>
               </div>
-            ) : (
-              <Link to="/login">
-                <Button variant="outline" className="text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-blue-600 font-medium">
-                  <User className="w-4 h-4 mr-2 text-gray-500" />
-                  Citizen Login
-                </Button>
-              </Link>
-            )}
+            ) : isAuthenticated ? (
+              /* CITIZEN LOGGED IN VIEW */
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-[#1e293b]/80 border border-slate-200 dark:border-slate-700/80 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span className="max-w-[140px] truncate">{displayName}</span>
+                  <span className="ml-1 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                    Citizen
+                  </span>
+                </div>
 
-            <Link to="/report">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md shadow-blue-600/20">
-                <PlusCircle className="w-4 h-4 mr-2" />
-                Report Issue
-              </Button>
-            </Link>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  size="sm"
+                  className="text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-[#1e293b]/80 hover:text-rose-600 font-medium rounded-full"
+                >
+                  <LogOut className="w-3.5 h-3.5 mr-1 text-slate-500 dark:text-slate-400" />
+                  Logout
+                </Button>
+
+                <Link to="/report">
+                  <Button size="sm" className="rounded-full">
+                    <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                    Report Issue
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              /* UNAUTHENTICATED LOGGED OUT VIEW */
+              <div className="flex items-center gap-2.5">
+                <Link to="/login">
+                  <Button variant="outline" size="sm" className="rounded-full text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700">
+                    <User className="w-3.5 h-3.5 mr-1.5 text-slate-500 dark:text-slate-400" />
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button size="sm" className="rounded-full">
+                    Get Started
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Mobile Menu Toggle */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center gap-2">
+            <ThemeToggle />
             <button
               onClick={toggleMenu}
               type="button"
-              className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none"
+              className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none"
               aria-label="Toggle Navigation"
             >
-              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -148,7 +206,7 @@ export function Navbar() {
 
       {/* Mobile Drawer */}
       {isOpen && (
-        <div className="md:hidden border-b border-gray-100 bg-white px-4 pt-2 pb-6 space-y-3">
+        <div className="md:hidden mt-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl px-4 pt-3 pb-6 space-y-3 shadow-xl">
           {navItems.map((item) => (
             <a
               key={item.name}
@@ -161,61 +219,89 @@ export function Navbar() {
                   setIsOpen(false);
                 }
               }}
-              className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+              className="block px-3 py-2 text-base font-medium text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl"
             >
               {item.name}
             </a>
           ))}
 
-          {user && (
+          {isCitizen && !isLandingPage && (
             <Link
               to="/dashboard"
               onClick={() => setIsOpen(false)}
-              className="block px-3 py-2 text-base font-medium text-blue-600 hover:bg-blue-50 rounded-lg"
+              className="block px-3 py-2 text-base font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl"
             >
               Dashboard
             </Link>
           )}
 
-          <Link
-            to={isAdmin ? '/admin' : '/admin/login'}
-            onClick={() => setIsOpen(false)}
-            className="block px-3 py-2 text-base font-medium text-slate-800 hover:text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-2"
-          >
-            <ShieldCheck className="w-4 h-4 text-blue-600" />
-            Admin Portal
-          </Link>
+          {isAdminView && (
+            <Link
+              to="/admin"
+              onClick={() => setIsOpen(false)}
+              className="block px-3 py-2 text-base font-medium text-slate-800 dark:text-slate-200 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl flex items-center gap-2"
+            >
+              <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              Admin Portal
+            </Link>
+          )}
 
-          <div className="pt-3 border-t border-gray-100 flex flex-col gap-2.5">
-            {user ? (
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
+            {isAdminView ? (
               <>
-                <div className="px-3 py-1.5 text-xs text-gray-500 font-medium truncate">
-                  Logged in as <span className="font-semibold text-gray-800">{user.email}</span>
+                <div className="px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium truncate flex items-center justify-between">
+                  <span>Logged in as <strong className="text-slate-800 dark:text-white">{displayName}</strong></span>
+                  <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/30">
+                    Admin
+                  </span>
                 </div>
                 <Button
                   onClick={handleLogout}
                   variant="outline"
-                  className="w-full justify-center text-gray-700 border-gray-200"
+                  className="w-full justify-center text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 rounded-xl"
                 >
                   <LogOut className="w-4 h-4 mr-2 text-rose-500" />
                   Logout
                 </Button>
               </>
-            ) : (
-              <Link to="/login" onClick={() => setIsOpen(false)}>
-                <Button variant="outline" className="w-full justify-center text-gray-700 border-gray-200">
-                  <User className="w-4 h-4 mr-2 text-gray-500" />
-                  Citizen Login
+            ) : isAuthenticated ? (
+              <>
+                <div className="px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium truncate flex items-center justify-between">
+                  <span>Logged in as <strong className="text-slate-800 dark:text-white">{displayName}</strong></span>
+                  <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                    Citizen
+                  </span>
+                </div>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="w-full justify-center text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 rounded-xl"
+                >
+                  <LogOut className="w-4 h-4 mr-2 text-rose-500" />
+                  Logout
                 </Button>
-              </Link>
+                <Link to="/report" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700 font-semibold rounded-xl">
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Report Issue
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Link to="/login" onClick={() => setIsOpen(false)}>
+                  <Button variant="outline" className="w-full justify-center text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 rounded-xl">
+                    <User className="w-4 h-4 mr-2 text-slate-500 dark:text-slate-400" />
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/login" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700 font-semibold rounded-xl">
+                    Get Started
+                  </Button>
+                </Link>
+              </div>
             )}
-
-            <Link to="/report" onClick={() => setIsOpen(false)}>
-              <Button className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700 font-semibold">
-                <PlusCircle className="w-4 h-4 mr-2" />
-                Report Issue
-              </Button>
-            </Link>
           </div>
         </div>
       )}

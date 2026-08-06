@@ -1,96 +1,120 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Sparkles, Send, Loader2, X, CheckCircle2 } from 'lucide-react';
-import { PageHeader } from '../../components/common/PageHeader';
+import {
+  Upload,
+  Sparkles,
+  MapPin,
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  FileText,
+  Send,
+  Loader2,
+  X,
+  Info,
+  ShieldCheck,
+  Tag,
+  HelpCircle,
+} from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { LocationPicker } from '../../components/common/LocationPicker';
-import { ISSUE_CATEGORIES } from '../../utils/constants';
-import { issueService } from '../../services/issueService';
-import { geminiService } from '../../services/geminiService';
+import { ISSUE_CATEGORIES, SEVERITY_LEVELS } from '../../utils/constants';
+import { analyzeImageWithGemini } from '../../services/geminiService';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { supabase } from '../../services/supabaseClient';
 
 export function ReportPage() {
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
 
+  const fileInputRef = useRef(null);
+
+  // Form State
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
-  const [description, setDescription] = useState('');
-  const [address, setAddress] = useState('');
-  const [latitude, setLatitude] = useState(null);
-  const [longitude, setLongitude] = useState(null);
+  const [category, setCategory] = useState('pothole');
   const [severity, setSeverity] = useState('Medium');
-  
-  const [imageFile, setImageFile] = useState(null);
+  const [description, setDescription] = useState('');
+
+  // Location State
+  const [locationData, setLocationData] = useState({
+    address: 'New Delhi, India',
+    latitude: 28.6139,
+    longitude: 77.2090,
+  });
+
+  // Image Upload & AI State
+  const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [aiAnalyzing, setAiAnalyzing] = useState(false);
 
-  const handleLocationChange = ({ latitude: newLat, longitude: newLng, address: newAddress }) => {
-    setLatitude(newLat);
-    setLongitude(newLng);
-    setAddress(newAddress);
-  };
-
-  const handleImageFileChange = (e) => {
+  // Handle File Selection
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload a valid image file (JPG, PNG, WEBP).');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image file size must not exceed 10MB.');
-      return;
-    }
-
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
-  };
-
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-      setImagePreview(null);
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size exceeds 10MB limit.');
+        return;
+      }
+      setSelectedFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+      runAiAnalysis(file);
     }
   };
 
+  // Run Gemini 1.5 Vision Analysis
+  const runAiAnalysis = async (file) => {
+    setIsAnalyzing(true);
+    try {
+      const result = await analyzeImageWithGemini(file);
+      setAiAnalysisResult(result);
+
+      if (result.category && result.confidence > 0.4) {
+        setCategory(result.category.toLowerCase());
+      }
+      if (result.severity) {
+        setSeverity(result.severity);
+      }
+      if (result.suggestedTitle) {
+        setTitle(result.suggestedTitle);
+      }
+      if (result.descriptionSummary) {
+        setDescription(result.descriptionSummary);
+      }
+
+      toast.success(`AI Analysis Complete! Detected ${result.category || 'civic issue'}.`);
+    } catch (err) {
+      console.error('AI Analysis failed:', err);
+      toast.error('AI pre-analysis failed. Please fill details manually.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleClearImage = () => {
+    setSelectedFile(null);
+    setImagePreview(null);
+    setAiAnalysisResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Handle Form Submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (isSubmitting || aiAnalyzing) return;
-
-    // Form Validation
-    if (!imageFile) {
-      toast.error('Please upload a photo of the issue.');
-      return;
-    }
-    if (!title.trim()) {
-      toast.error('Please enter an issue title.');
-      return;
-    }
-    if (!category) {
-      toast.error('Please select an issue category.');
-      return;
-    }
-    if (!description.trim()) {
-      toast.error('Please describe the civic issue.');
-      return;
-    }
-    if (!address.trim() || latitude === null || longitude === null) {
-      toast.error('Please select a valid location for the issue.');
+    if (!title.trim() || !description.trim()) {
+      toast.error('Please enter an issue title and description.');
       return;
     }
 
     if (!user) {
-      toast.error('You must be signed in to submit a complaint.');
+      toast.error('Please log in to submit a complaint.');
       navigate('/login');
       return;
     }
@@ -98,241 +122,275 @@ export function ReportPage() {
     setIsSubmitting(true);
 
     try {
-      // Step 1: Upload image to Supabase Storage bucket "complaints"
-      const { publicUrl, error: uploadError } = await issueService.uploadComplaintImage(
-        imageFile,
-        user.id
-      );
+      let uploadedImageUrl = null;
 
-      if (uploadError || !publicUrl) {
-        toast.error(uploadError?.message || 'Upload Failure: Failed to upload issue image.');
-        setIsSubmitting(false);
-        return;
+      // 1. Upload Image to Supabase Storage if file is present
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('complaints')
+          .upload(filePath, selectedFile);
+
+        if (uploadError) {
+          console.warn('Supabase storage upload error:', uploadError.message);
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from('complaints')
+            .getPublicUrl(filePath);
+          uploadedImageUrl = publicUrlData?.publicUrl || null;
+        }
       }
 
-      // Step 2: Create complaint record & complaint_images record in Supabase (status = "Pending")
-      const { data: createData, error: createError } = await issueService.createIssue({
-        userId: user.id,
-        userEmail: user.email || '',
-        userName: user.user_metadata?.full_name || '',
+      // 2. Insert Complaint Payload into Supabase
+      const payload = {
+        user_id: user.id,
         title: title.trim(),
-        description: description.trim(),
         category,
         severity,
-        latitude,
-        longitude,
-        address: address.trim(),
-        priority: 'Medium',
-        imageUrl: publicUrl,
-      });
+        description: description.trim(),
+        address: locationData.address,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        status: 'Pending',
+        upvotes: 1,
+        ai_summary: aiAnalysisResult?.descriptionSummary || null,
+        ai_confidence: aiAnalysisResult?.confidence || null,
+      };
 
-      if (createError || !createData) {
-        toast.error(createError?.message || 'Upload Failure: Unable to save complaint.');
-        setIsSubmitting(false);
-        return;
+      const { data: insertedComplaint, error: insertError } = await supabase
+        .from('complaints')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (insertError) {
+        throw new Error(insertError.message);
       }
 
-      const complaintId = createData.id;
-
-      // Requirement 8: Show a loading indicator ("AI is analyzing the uploaded issue...")
-      setAiAnalyzing(true);
-      toast.info('AI is analyzing the uploaded issue...');
-
-      // Step 3: Trigger Google Gemini 2.5 Flash Vision AI analysis
-      const aiResult = await geminiService.processAndSaveAiAnalysis(complaintId, {
-        imageFile,
-        imageUrl: publicUrl,
-      });
-
-      // Requirement 9: Show a success toast after AI completes
-      if (aiResult.success) {
-        toast.success('AI analysis completed successfully.');
-      } else {
-        toast.warning('Complaint saved, but AI analysis failed.');
+      // 3. Attach uploaded image record if available
+      if (insertedComplaint && uploadedImageUrl) {
+        await supabase.from('complaint_images').insert([
+          {
+            complaint_id: insertedComplaint.id,
+            image_url: uploadedImageUrl,
+          },
+        ]);
       }
 
-      toast.success('Upload Success! Complaint reported successfully.');
+      toast.success('Civic Issue Report Submitted Successfully!');
       navigate('/dashboard');
     } catch (err) {
       console.error('Submission error:', err);
-      toast.error(err.message || 'Upload Failure: An unexpected error occurred.');
+      toast.error(`Submission failed: ${err.message || 'Server error'}`);
     } finally {
       setIsSubmitting(false);
-      setAiAnalyzing(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <PageHeader
-        title="Report a Civic Issue"
-        description="Submit a report with photo evidence and GIS location for municipal resolution."
-      />
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      
+      {/* Header */}
+      <div className="text-center space-y-2 max-w-2xl mx-auto">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 text-xs font-semibold border border-blue-100 dark:border-blue-500/30">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Google Gemini Vision Powered</span>
+        </div>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Report a Civic Issue
+        </h1>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Upload a photo of public infrastructure damage. Our AI model will auto-classify the category, severity rating, and location.
+        </p>
+      </div>
 
-      <Card className="shadow-xs border-gray-200 p-6 sm:p-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
-
-          {/* 1. Photo Upload Section */}
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-800">
-              Upload Issue Photo <span className="text-rose-500">*</span>
-            </label>
-
-            {imagePreview ? (
-              <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gray-900 flex items-center justify-center max-h-80 group">
-                <img
-                  src={imagePreview}
-                  alt="Issue Preview"
-                  className="max-h-80 w-auto object-contain"
-                />
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="absolute top-3 right-3 bg-gray-900/80 hover:bg-rose-600 text-white p-2 rounded-full backdrop-blur-xs transition-colors shadow-md"
-                  aria-label="Remove image"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-xs text-white text-xs px-3 py-1 rounded-full flex items-center gap-1.5 font-medium">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Image Selected ({imageFile.name})
-                </div>
-              </div>
-            ) : (
-              <label className="block border-2 border-dashed border-gray-300 hover:border-blue-500 bg-gray-50/50 hover:bg-blue-50/30 rounded-2xl p-8 text-center transition-colors cursor-pointer group">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleImageFileChange}
-                  className="hidden"
-                />
-                <div className="mx-auto w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                  <Camera className="w-7 h-7" />
-                </div>
-                <p className="text-sm font-semibold text-gray-800">
-                  Click or drag & drop photo here
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Supports JPG, PNG, WEBP up to 10MB
-                </p>
-                <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100/60 text-blue-700 rounded-full text-xs font-medium">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  Supabase Complaints Storage Ready
-                </div>
-              </label>
-            )}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        
+        {/* Step 1: Image Upload & AI Triage */}
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Camera className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              1. Issue Photo & AI Triage
+            </h3>
+            <span className="text-xs text-slate-400 dark:text-slate-400">Step 1 of 3</span>
           </div>
 
-          {/* 2. Issue Title */}
-          <div className="space-y-1">
-            <label className="block text-sm font-semibold text-gray-800">
-              Issue Title <span className="text-rose-500">*</span>
-            </label>
+          {!imagePreview ? (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 rounded-2xl p-8 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 transition-all space-y-3"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center border border-blue-100 dark:border-blue-500/30">
+                <Upload className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-slate-800 dark:text-white">
+                  Click or drag photo to upload
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Supports JPG, PNG, WEBP up to 10MB
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="relative rounded-2xl overflow-hidden max-h-80 bg-slate-900 flex items-center justify-center border border-slate-200 dark:border-slate-800">
+                <img src={imagePreview} alt="Issue preview" className="object-contain max-h-80 w-full" />
+                <button
+                  type="button"
+                  onClick={handleClearImage}
+                  className="absolute top-3 right-3 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-rose-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* AI Analysis Result Panel */}
+              {isAnalyzing ? (
+                <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 flex items-center gap-3 text-blue-700 dark:text-blue-300 text-xs">
+                  <Loader2 className="w-5 h-5 animate-spin shrink-0 text-blue-600 dark:text-blue-400" />
+                  <span>Gemini Vision AI is analyzing image categories and severity...</span>
+                </div>
+              ) : aiAnalysisResult ? (
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                      <Sparkles className="w-4 h-4" /> AI Auto-Detected Details
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400 font-mono">
+                      Confidence: {Math.round((aiAnalysisResult.confidence || 0.85) * 100)}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                    "{aiAnalysisResult.descriptionSummary}"
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </Card>
+
+        {/* Step 2: Location Details */}
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              2. Precise Location Tagging
+            </h3>
+            <span className="text-xs text-slate-400 dark:text-slate-400">Step 2 of 3</span>
+          </div>
+
+          <LocationPicker
+            onLocationSelect={(loc) => setLocationData(loc)}
+            initialAddress={locationData.address}
+          />
+        </Card>
+
+        {/* Step 3: Issue Details */}
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              3. Ticket Metadata
+            </h3>
+            <span className="text-xs text-slate-400 dark:text-slate-400">Step 3 of 3</span>
+          </div>
+
+          <div className="space-y-4">
             <Input
-              placeholder="e.g. Deep Pothole causing traffic delay"
+              label="Issue Title *"
+              placeholder="e.g. Deep Pothole on Main Street Outer Lane"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
             />
-          </div>
 
-          {/* 3. Issue Category & Severity */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="block text-sm font-semibold text-gray-800">
-                Issue Category <span className="text-rose-500">*</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Category Dropdown */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Category *
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-100/80 border border-slate-200/80 rounded-xl text-slate-900 text-sm focus:outline-none dark:bg-slate-800/50 dark:border-slate-700/80 dark:text-white focus:dark:border-blue-500 focus:dark:ring-1 focus:dark:ring-blue-500 transition-colors cursor-pointer"
+                >
+                  {ISSUE_CATEGORIES.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Severity Dropdown */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Urgency Severity *
+                </label>
+                <select
+                  value={severity}
+                  onChange={(e) => setSeverity(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-100/80 border border-slate-200/80 rounded-xl text-slate-900 text-sm focus:outline-none dark:bg-slate-800/50 dark:border-slate-700/80 dark:text-white focus:dark:border-blue-500 focus:dark:ring-1 focus:dark:ring-blue-500 transition-colors cursor-pointer"
+                >
+                  {SEVERITY_LEVELS.map((sev) => (
+                    <option key={sev} value={sev}>
+                      {sev}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Description Textarea */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Detailed Description *
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+              <textarea
+                rows={4}
                 required
-                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                <option value="">Select issue category</option>
-                {ISSUE_CATEGORIES.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-sm font-semibold text-gray-800">
-                Severity Level
-              </label>
-              <select
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                <option value="Low">Low - Minor Inconvenience</option>
-                <option value="Medium">Medium - Standard Hazard</option>
-                <option value="High">High - Urgent Attention Needed</option>
-                <option value="Critical">Critical - Immediate Public Risk</option>
-              </select>
+                placeholder="Describe the issue, dimensions, hazard impact, or nearby landmarks..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-100/80 border border-slate-200/80 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none dark:bg-slate-800/50 dark:border-slate-700/80 dark:text-white dark:placeholder-slate-500 focus:dark:border-blue-500 focus:dark:ring-1 focus:dark:ring-blue-500 transition-colors resize-none"
+              />
             </div>
           </div>
 
-          {/* 4. Professional Location Picker Module */}
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-800">
-              Location Selection <span className="text-rose-500">*</span>
-            </label>
-            <LocationPicker
-              latitude={latitude}
-              longitude={longitude}
-              address={address}
-              onChange={handleLocationChange}
-              disabled={isSubmitting}
-            />
-          </div>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 flex items-center justify-center cursor-pointer transition-all"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Dispatching Ticket Payload...
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5 mr-2" />
+                Submit Civic Issue Report
+              </>
+            )}
+          </Button>
+        </Card>
 
-          {/* 5. Additional Description */}
-          <div className="space-y-1">
-            <label className="block text-sm font-semibold text-gray-800">
-              Description & Details <span className="text-rose-500">*</span>
-            </label>
-            <textarea
-              rows={4}
-              required
-              placeholder="Describe specifics such as depth, landmarks, or hazard severity..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
-            />
-          </div>
-
-          {/* 6. Form Action Buttons */}
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-blue-600 hover:bg-blue-700 text-white min-w-[160px] flex items-center justify-center font-semibold"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Uploading & Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4 mr-2" />
-                  Submit Report
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
-      </Card>
+      </form>
     </div>
   );
 }

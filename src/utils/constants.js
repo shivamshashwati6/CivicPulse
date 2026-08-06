@@ -12,6 +12,8 @@ export const ISSUE_CATEGORIES = [
   { id: 'other', label: 'Other Civic Issue', description: 'Other public infrastructure problem' },
 ];
 
+export const SEVERITY_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
+
 export const ISSUE_STATUSES = {
   SUBMITTED: { label: 'Submitted', color: 'bg-blue-100 text-blue-800 border-blue-200' },
   UNDER_REVIEW: { label: 'Under Review', color: 'bg-amber-100 text-amber-800 border-amber-200' },

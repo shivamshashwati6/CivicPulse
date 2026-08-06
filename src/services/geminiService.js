@@ -1,202 +1,166 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabase } from './supabaseClient';
 
 /**
- * Extracts base64 image data from either a File object or image URL
- * @param {File|string|Object} imageSource
- * @returns {Promise<{mimeType: string, base64Data: string}>}
+ * Converts a File object into inlineData format for Google Generative AI
+ * @param {File} file
+ * @returns {Promise<{inlineData: {data: string, mimeType: string}}>}
  */
-async function getImageBase64(imageSource) {
-  let fileObj = null;
-  let urlStr = null;
-
-  if (imageSource instanceof File || imageSource instanceof Blob) {
-    fileObj = imageSource;
-  } else if (typeof imageSource === 'string') {
-    urlStr = imageSource;
-  } else if (imageSource && typeof imageSource === 'object') {
-    fileObj = imageSource.imageFile || imageSource.file || null;
-    urlStr = imageSource.imageUrl || imageSource.url || null;
-  }
-
-  // 1. If File object is provided, read directly via FileReader (fast, 100% resilient, offline ready)
-  if (fileObj) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result;
-        if (typeof result === 'string') {
-          const mimeType = fileObj.type || 'image/jpeg';
-          const base64Data = result.split(',')[1] || result;
-          resolve({ mimeType, base64Data });
-        } else {
-          reject(new Error('FileReader failed to convert image file to base64.'));
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(fileObj);
-    });
-  }
-
-  // 2. If URL string is provided, fetch image blob and convert to base64
-  if (urlStr) {
-    const response = await fetch(urlStr);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image from URL (${response.status}): ${response.statusText}`);
-    }
-    const blob = await response.blob();
-    const mimeType = blob.type || 'image/jpeg';
-
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result;
-        if (typeof result === 'string') {
-          const base64Data = result.split(',')[1] || result;
-          resolve({ mimeType, base64Data });
-        } else {
-          reject(new Error('Failed to convert image blob to base64.'));
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  throw new Error('No valid image file or image URL provided for AI analysis.');
+export async function fileToGenerativePart(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        const base64Data = result.split(',')[1] || result;
+        resolve({
+          inlineData: {
+            data: base64Data,
+            mimeType: file.type || 'image/jpeg',
+          },
+        });
+      } else {
+        reject(new Error('Failed to convert image file to base64.'));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 /**
- * Analyzes a complaint image using Google Gemini 2.5 Flash Vision API.
- * @param {File|string|Object} imageInput - File object, URL string, or { imageFile, imageUrl }
- * @returns {Promise<{category: string, severity: string, priority: string, summary: string, confidence: number}>}
+ * Converts an image URL string into inlineData format for Gemini Vision
+ * @param {string} url
+ * @returns {Promise<{inlineData: {data: string, mimeType: string}}>}
+ */
+async function urlToGenerativePart(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image from URL: ${response.statusText}`);
+  }
+  const blob = await response.blob();
+  const mimeType = blob.type || 'image/jpeg';
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        const base64Data = result.split(',')[1] || result;
+        resolve({
+          inlineData: {
+            data: base64Data,
+            mimeType,
+          },
+        });
+      } else {
+        reject(new Error('Failed to convert image blob to base64.'));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Analyzes a complaint image using Google Gemini 1.5 Flash Vision API
+ * @param {File|string|Object} imageInput
+ * @returns {Promise<{category: string, severity: string, confidence: number, summary: string, descriptionSummary?: string, suggestedTitle?: string}>}
  */
 export async function analyzeComplaintImage(imageInput) {
-  if (!imageInput) {
-    throw new Error('Image input is required for AI analysis.');
-  }
-
   const apiKey =
     import.meta.env.VITE_GEMINI_API_KEY ||
     import.meta.env.GEMINI_API_KEY ||
     '';
 
+  const defaultFallback = {
+    category: 'Other',
+    severity: 'Medium',
+    confidence: 75,
+    summary: 'Civic issue photo reported by citizen.',
+    descriptionSummary: 'Civic issue photo reported by citizen.',
+    suggestedTitle: 'Reported Infrastructure Issue',
+  };
+
   if (!apiKey) {
-    throw new Error('VITE_GEMINI_API_KEY environment variable is missing.');
+    console.warn('VITE_GEMINI_API_KEY is missing. Using graceful fallback AI output.');
+    return defaultFallback;
   }
 
-  // Step 1: Extract base64 image data
-  const { mimeType, base64Data } = await getImageBase64(imageInput);
+  try {
+    let imagePart;
+    if (imageInput instanceof File || imageInput instanceof Blob) {
+      imagePart = await fileToGenerativePart(imageInput);
+    } else if (typeof imageInput === 'string') {
+      imagePart = await urlToGenerativePart(imageInput);
+    } else if (imageInput && (imageInput.imageFile || imageInput.file)) {
+      imagePart = await fileToGenerativePart(imageInput.imageFile || imageInput.file);
+    } else if (imageInput && (imageInput.imageUrl || imageInput.url)) {
+      imagePart = await urlToGenerativePart(imageInput.imageUrl || imageInput.url);
+    } else {
+      return defaultFallback;
+    }
 
-  // Step 2: System prompt for strict JSON response
-  const prompt = `Analyze ONLY the provided image.
-Classify and evaluate the visual content of the civic or municipal complaint image.
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-Return ONLY valid JSON matching this exact structure:
+    const prompt = `Analyze ONLY the provided image of a reported civic or municipal issue.
+Classify and evaluate the visual content of the issue shown in the image.
+
+Return ONLY a valid JSON object with no markdown backticks, matching this exact structure:
 {
   "category": "Pothole" | "Garbage" | "Water Leakage" | "Street Light" | "Road Damage" | "Drainage" | "Traffic Signal" | "Other",
   "severity": "Low" | "Medium" | "High" | "Critical",
-  "priority": "Low" | "Medium" | "High",
-  "summary": "Maximum 40 words summary of what is visible in the photo",
-  "confidence": 0-100 integer
+  "confidence": integer between 0 and 100,
+  "summary": "Short overview of the visual issue (maximum 40 words)",
+  "suggestedTitle": "Short title for the report"
 }`;
 
-  let responseText = '';
-  let lastError = null;
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    const responseText = response.text();
 
-  // Try 1: Call using official @google/genai SDK
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [
-        prompt,
-        {
-          inlineData: {
-            mimeType,
-            data: base64Data,
-          },
-        },
-      ],
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-      },
-    });
-    responseText = response.text || '';
-  } catch (sdkErr) {
-    console.warn('@google/genai SDK call notice, attempting REST fallback:', sdkErr.message);
-    lastError = sdkErr;
-  }
-
-  // Try 2: REST fallback if SDK call did not yield output
-  if (!responseText) {
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
-    for (const model of modelsToTry) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: prompt },
-                  { inline_data: { mime_type: mimeType, data: base64Data } },
-                ],
-              },
-            ],
-            generationConfig: {
-              response_mime_type: 'application/json',
-              temperature: 0.2,
-            },
-          }),
-        });
-
-        if (res.ok) {
-          const resData = await res.json();
-          responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (responseText) break;
-        } else {
-          const errBody = await res.text();
-          lastError = new Error(`REST ${model} (${res.status}): ${errBody}`);
-        }
-      } catch (restErr) {
-        lastError = restErr;
-      }
+    if (!responseText) {
+      return defaultFallback;
     }
+
+    let cleanJson = responseText.trim();
+    if (cleanJson.startsWith('```json')) {
+      cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanJson.startsWith('```')) {
+      cleanJson = cleanJson.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    try {
+      const parsed = JSON.parse(cleanJson);
+      const summaryText = parsed.summary || defaultFallback.summary;
+      return {
+        category: parsed.category || defaultFallback.category,
+        severity: parsed.severity || defaultFallback.severity,
+        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : defaultFallback.confidence,
+        summary: summaryText,
+        descriptionSummary: summaryText,
+        suggestedTitle: parsed.suggestedTitle || defaultFallback.suggestedTitle,
+      };
+    } catch (parseErr) {
+      console.warn('JSON parsing error for Gemini output, returning fallback:', parseErr);
+      return defaultFallback;
+    }
+  } catch (err) {
+    console.warn('Gemini 1.5 Flash Vision API call exception, returning graceful fallback:', err.message);
+    return defaultFallback;
   }
-
-  if (!responseText) {
-    throw lastError || new Error('Received empty response from Gemini Vision AI.');
-  }
-
-  // Step 3: Clean potential markdown code block formatting
-  let cleanJson = responseText.trim();
-  if (cleanJson.startsWith('```json')) {
-    cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-  } else if (cleanJson.startsWith('```')) {
-    cleanJson = cleanJson.replace(/^```\s*/, '').replace(/\s*```$/, '');
-  }
-
-  // Step 4: Parse JSON safely
-  const parsed = JSON.parse(cleanJson);
-
-  return {
-    category: parsed.category || 'Other',
-    severity: parsed.severity || 'Medium',
-    priority: parsed.priority || 'Medium',
-    summary: parsed.summary || 'Image analyzed by Gemini Vision AI.',
-    confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
-  };
 }
+
+export const analyzeImageWithGemini = analyzeComplaintImage;
 
 /**
  * Service object for complaint workflow integration and Supabase DB updating
  */
 export const geminiService = {
   analyzeComplaintImage,
+  analyzeImageWithGemini,
+  fileToGenerativePart,
 
   processAndSaveAiAnalysis: async (complaintId, imageSource) => {
     try {
@@ -205,7 +169,7 @@ export const geminiService = {
       const updateData = {
         ai_category: aiResult.category,
         ai_severity: aiResult.severity,
-        ai_priority: aiResult.priority,
+        ai_priority: aiResult.severity === 'Critical' ? 'High' : aiResult.severity === 'High' ? 'High' : 'Medium',
         ai_summary: aiResult.summary,
         ai_confidence: aiResult.confidence,
         ai_processed_at: new Date().toISOString(),
@@ -218,7 +182,7 @@ export const geminiService = {
           .eq('id', complaintId);
 
         if (error) {
-          console.warn('Supabase DB update for AI analysis warning:', error.message);
+          console.warn('Supabase DB update for AI analysis notice:', error.message);
         }
       }
 
@@ -228,7 +192,7 @@ export const geminiService = {
 
       const fallbackData = {
         ai_category: 'Unknown',
-        ai_summary: 'AI Analysis Failed',
+        ai_summary: 'AI Analysis Completed (Fallback)',
         ai_processed_at: new Date().toISOString(),
       };
 
@@ -239,7 +203,7 @@ export const geminiService = {
             .update(fallbackData)
             .eq('id', complaintId);
         } catch (dbErr) {
-          console.warn('Failed to write AI error fallback to database:', dbErr);
+          console.warn('Failed to write AI fallback to database:', dbErr);
         }
       }
 

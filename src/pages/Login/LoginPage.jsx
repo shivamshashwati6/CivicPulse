@@ -101,16 +101,16 @@ export function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto py-12 px-4">
-      <Card className="shadow-lg border-slate-200">
+    <div className="max-w-md mx-auto py-12 px-4 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      <Card className="shadow-lg border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 backdrop-blur-xl">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 mb-2">
             <Activity className="w-6 h-6" />
           </div>
-          <CardTitle className="text-2xl font-bold">
+          <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white">
             {isSignUp ? 'Create CivicPulse Account' : 'Sign In to CivicPulse'}
           </CardTitle>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             {isSignUp
               ? 'Join your community to report issues and track municipal resolutions.'
               : 'Access your civic reporting dashboard and track active issues.'}
@@ -119,22 +119,22 @@ export function LoginPage() {
 
         <CardContent className="space-y-4">
           {signUpSuccessMsg && (
-            <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-start gap-2.5">
-              <MailCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 text-xs flex items-start gap-2.5">
+              <MailCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
               <p className="leading-relaxed">{signUpSuccessMsg}</p>
             </div>
           )}
 
           {emailDisabledAlert && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1.5">
-              <div className="flex items-center gap-2 font-semibold text-rose-800">
-                <Settings className="w-4 h-4 text-rose-600 shrink-0" />
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold text-rose-800 dark:text-rose-300">
+                <Settings className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                 <span>Email Provider is Disabled in Supabase</span>
               </div>
-              <p className="leading-relaxed text-rose-700">
+              <p className="leading-relaxed text-rose-700 dark:text-rose-300/90">
                 Email Authentication has been turned off in your Supabase project settings.
               </p>
-              <div className="pt-1 text-[11px] text-rose-900/90 border-t border-rose-200/60 font-mono leading-relaxed">
+              <div className="pt-1 text-[11px] text-rose-900/90 dark:text-rose-300/80 border-t border-rose-200/60 dark:border-rose-800/60 font-mono leading-relaxed">
                 <strong>Fix in Supabase Dashboard:</strong><br />
                 1. Go to <em>Authentication &gt; Providers &gt; Email</em><br />
                 2. Turn <strong>"Enable Email provider"</strong> to <strong>ON</strong><br />
@@ -144,15 +144,15 @@ export function LoginPage() {
           )}
 
           {emailUnconfirmedAlert && (
-            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1.5">
-              <div className="flex items-center gap-2 font-semibold text-amber-800">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-300">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                 <span>Email Address Not Confirmed</span>
               </div>
-              <p className="leading-relaxed text-amber-700">
+              <p className="leading-relaxed text-amber-700 dark:text-amber-300/90">
                 Supabase requires email confirmation before logging in. Please check your inbox (and spam folder) for the verification link.
               </p>
-              <div className="pt-1 text-[11px] text-amber-800/80 border-t border-amber-200/60">
+              <div className="pt-1 text-[11px] text-amber-800/80 dark:text-amber-300/80 border-t border-amber-200/60 dark:border-amber-800/60">
                 <strong>Dev Tip:</strong> To disable email verification for testing, go to your <em>Supabase Dashboard &gt; Authentication &gt; Providers &gt; Email</em> and turn off <strong>"Confirm email"</strong>.
               </div>
             </div>
@@ -201,8 +201,8 @@ export function LoginPage() {
 
             {!isSignUp && (
               <div className="flex items-center justify-between text-xs">
-                <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-                  <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                <label className="flex items-center gap-2 text-slate-600 dark:text-slate-400 cursor-pointer">
+                  <input type="checkbox" className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500" />
                   Remember me
                 </label>
                 <a
@@ -211,7 +211,7 @@ export function LoginPage() {
                     e.preventDefault();
                     toast.info('Password reset instructions will be sent to your email.');
                   }}
-                  className="text-blue-600 font-medium hover:underline"
+                  className="text-blue-600 dark:text-blue-400 font-medium hover:underline"
                 >
                   Forgot password?
                 </a>
@@ -221,7 +221,7 @@ export function LoginPage() {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center font-medium"
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center font-medium shadow-md shadow-blue-600/20 cursor-pointer"
             >
               {isSubmitting ? (
                 <>
@@ -242,13 +242,13 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-500 border-t border-slate-100 pt-4 space-y-2">
+          <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2">
             <p>
               {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-blue-600 font-semibold hover:underline focus:outline-none"
+                className="text-blue-600 dark:text-blue-400 font-semibold hover:underline focus:outline-none cursor-pointer"
               >
                 {isSignUp ? 'Sign In' : 'Create Account'}
               </button>
