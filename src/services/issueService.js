@@ -300,8 +300,8 @@ export const issueService = {
         .select();
 
       if (complaintError) {
-        console.warn('Supabase DB complaint insert notice, stored in local queue:', complaintError.message);
-        return { data: complaintObj, error: null };
+        console.error('Supabase DB complaint insert failed:', complaintError);
+        return { data: complaintObj, error: complaintError };
       }
 
       const insertedRecord = Array.isArray(complaintData) ? complaintData[0] : complaintData;
