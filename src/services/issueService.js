@@ -221,7 +221,7 @@ export const issueService = {
   },
 
   /**
-   * Create a new complaint record with graceful network failure fallback
+   * Create a new complaint record with graceful network & local storage sync
    */
   async createIssue({
     userId,
@@ -239,7 +239,7 @@ export const issueService = {
   }) {
     const validUserId = toValidUuid(userId);
 
-    const fallbackComplaint = {
+    const complaintObj = {
       id: `cmp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       user_id: validUserId,
       title,
@@ -259,6 +259,9 @@ export const issueService = {
         full_name: userName,
       },
     };
+
+    // Always save local backup so complaint is immediately available on citizen dashboard and admin panel
+    saveLocalComplaint(complaintObj);
 
     try {
       // Step 1: Ensure user profile row exists in public.profiles table
@@ -297,13 +300,12 @@ export const issueService = {
         .select();
 
       if (complaintError) {
-        console.warn('Supabase DB complaint insert error, saving to local fallback queue:', complaintError);
-        saveLocalComplaint(fallbackComplaint);
-        return { data: fallbackComplaint, error: null };
+        console.warn('Supabase DB complaint insert notice, stored in local queue:', complaintError.message);
+        return { data: complaintObj, error: null };
       }
 
       const insertedRecord = Array.isArray(complaintData) ? complaintData[0] : complaintData;
-      const finalId = insertedRecord?.id || fallbackComplaint.id;
+      const finalId = insertedRecord?.id || complaintObj.id;
 
       // Step 3: Insert image record into public.complaint_images
       if (imageUrl && finalId) {
@@ -323,13 +325,17 @@ export const issueService = {
         ...insertedRecord,
         id: finalId,
         complaint_images: imageUrl ? [{ id: `img_${Date.now()}`, image_url: imageUrl }] : [],
+        profiles: {
+          email: userEmail,
+          full_name: userName,
+        },
       };
 
+      saveLocalComplaint(finalComplaintObj);
       return { data: finalComplaintObj, error: null };
     } catch (err) {
-      console.warn('Network exception during createIssue (Failed to fetch), using resilient local queue:', err);
-      saveLocalComplaint(fallbackComplaint);
-      return { data: fallbackComplaint, error: null };
+      console.warn('Network exception during createIssue, saved to resilient local queue:', err);
+      return { data: complaintObj, error: null };
     }
   },
 
@@ -358,10 +364,20 @@ export const issueService = {
   },
 
   /**
-   * Fetch user complaints directly from Supabase (deduplicated by ID)
+   * Fetch user complaints (combines remote Supabase and local storage, deduplicated)
    */
   async fetchUserComplaints(userId) {
     const validUserId = toValidUuid(userId);
+    const localData = getLocalComplaints().filter(
+      (c) => c.user_id === validUserId || c.user_id === userId
+    );
+
+    const map = new Map();
+    localData.forEach((item) => {
+      if (item && item.id) {
+        map.set(item.id, item);
+      }
+    });
 
     try {
       const { data: remoteData, error } = await supabase
@@ -377,30 +393,34 @@ export const issueService = {
         .order('created_at', { ascending: false });
 
       if (!error && remoteData) {
-        const map = new Map();
         remoteData.forEach((item) => {
-          if (item && item.id && !map.has(item.id)) {
+          if (item && item.id) {
             map.set(item.id, item);
           }
         });
-        return { data: Array.from(map.values()), error: null };
       }
     } catch (err) {
-      console.warn('Supabase fetchUserComplaints exception (Failed to fetch), returning local complaints:', err);
+      console.warn('Supabase fetchUserComplaints exception:', err);
     }
 
-    const localData = getLocalComplaints().filter(
-      (c) => c.user_id === validUserId || c.user_id === userId
-    );
-    return { data: localData, error: null };
+    return { data: Array.from(map.values()), error: null };
   },
 
   /**
-   * Fetch ALL complaints for Admin Control Panel directly from Supabase (deduplicated by ID)
+   * Fetch ALL complaints for Admin Control Panel (combines remote Supabase and local storage, deduplicated)
    */
   async fetchAllComplaints() {
+    const localData = getLocalComplaints();
+    const map = new Map();
+
+    localData.forEach((item) => {
+      if (item && item.id) {
+        map.set(item.id, item);
+      }
+    });
+
     try {
-      const { data: remoteData, error } = await supabase
+      let { data: remoteData, error } = await supabase
         .from('complaints')
         .select(`
           *,
@@ -409,6 +429,7 @@ export const issueService = {
             image_url
           ),
           profiles (
+            id,
             full_name,
             email,
             phone
@@ -416,21 +437,33 @@ export const issueService = {
         `)
         .order('created_at', { ascending: false });
 
-      if (!error && remoteData) {
-        const map = new Map();
+      if (error) {
+        const { data: rawComplaints } = await supabase
+          .from('complaints')
+          .select(`
+            *,
+            complaint_images (
+              id,
+              image_url
+            )
+          `)
+          .order('created_at', { ascending: false });
+        
+        remoteData = rawComplaints || [];
+      }
+
+      if (remoteData && remoteData.length > 0) {
         remoteData.forEach((item) => {
-          if (item && item.id && !map.has(item.id)) {
+          if (item && item.id) {
             map.set(item.id, item);
           }
         });
-        return { data: Array.from(map.values()), error: null };
       }
     } catch (err) {
-      console.warn('Supabase fetchAllComplaints exception (Failed to fetch), returning local complaints:', err);
+      console.warn('Supabase fetchAllComplaints exception:', err);
     }
 
-    const localData = getLocalComplaints();
-    return { data: localData, error: null };
+    return { data: Array.from(map.values()), error: null };
   },
 
   /**
@@ -468,7 +501,7 @@ export const issueService = {
 
       return { data, error: null };
     } catch (err) {
-      console.warn('Supabase updateComplaintStatus exception (Failed to fetch):', err);
+      console.warn('Supabase updateComplaintStatus exception:', err);
       return { data: null, error: null };
     }
   },

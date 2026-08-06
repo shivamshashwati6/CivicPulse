@@ -35,6 +35,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { ISSUE_CATEGORIES } from '../../utils/constants';
 import { supabase } from '../../services/supabaseClient';
+import { issueService } from '../../services/issueService';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useTheme } from '../../hooks/useTheme';
@@ -110,68 +111,15 @@ export function AdminPage() {
   const [updatingId, setUpdatingId] = useState(null);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
 
-  // Fetch ALL complaints directly from Supabase
+  // Fetch ALL complaints directly from issueService (syncs Supabase and local storage queue)
   const fetchComplaintsDirectly = useCallback(async () => {
     setLoading(true);
     try {
-      let { data: complaintsData, error } = await supabase
-        .from('complaints')
-        .select(`
-          *,
-          complaint_images (
-            id,
-            image_url
-          ),
-          profiles (
-            id,
-            email,
-            full_name
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.warn('Supabase relational join fallback:', error.message);
-        const { data: rawComplaints, error: complaintsErr } = await supabase
-          .from('complaints')
-          .select(`
-            *,
-            complaint_images (
-              id,
-              image_url
-            )
-          `)
-          .order('created_at', { ascending: false });
-
-        if (complaintsErr) {
-          toast.error(`Database error: ${complaintsErr.message}`);
-          setComplaints([]);
-          setLoading(false);
-          return;
-        }
-
-        complaintsData = rawComplaints || [];
-
-        try {
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, email, full_name');
-
-          if (profilesData && profilesData.length > 0) {
-            const profileMap = new Map(profilesData.map((p) => [p.id, p]));
-            complaintsData = complaintsData.map((item) => ({
-              ...item,
-              profiles: profileMap.get(item.user_id) || null,
-            }));
-          }
-        } catch (profileFetchErr) {
-          console.warn('Could not fetch profiles:', profileFetchErr);
-        }
-      }
+      const { data: allComplaints } = await issueService.fetchAllComplaints();
 
       // Deduplicate by unique complaint ID
       const uniqueMap = new Map();
-      (complaintsData || []).forEach((item) => {
+      (allComplaints || []).forEach((item) => {
         if (item && item.id && !uniqueMap.has(item.id)) {
           uniqueMap.set(item.id, item);
         }
@@ -179,7 +127,7 @@ export function AdminPage() {
 
       setComplaints(Array.from(uniqueMap.values()));
     } catch (err) {
-      console.error('Direct Supabase fetch exception:', err);
+      console.error('Direct complaint fetch exception:', err);
       toast.error('Failed to fetch complaints from database.');
     } finally {
       setLoading(false);
@@ -212,13 +160,7 @@ export function AdminPage() {
   const handleStatusChange = async (complaintId, newStatus) => {
     setUpdatingId(complaintId);
     try {
-      const { error } = await supabase
-        .from('complaints')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', complaintId);
+      const { error } = await issueService.updateComplaintStatus(complaintId, newStatus);
 
       if (error) {
         toast.error(`Update failed: ${error.message}`);
