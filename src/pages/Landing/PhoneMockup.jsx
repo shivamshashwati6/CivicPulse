@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, MapPin, Sparkles, CheckCircle2, AlertTriangle, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Camera, MapPin, Sparkles, ShieldCheck } from 'lucide-react';
 
 export function PhoneMockup() {
   return (

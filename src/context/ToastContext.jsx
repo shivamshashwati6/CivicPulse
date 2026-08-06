@@ -7,6 +7,7 @@ const ToastContext = createContext({
   success: () => {},
   error: () => {},
   info: () => {},
+  warning: () => {},
 });
 
 export function ToastProvider({ children }) {
@@ -38,10 +39,11 @@ export function ToastProvider({ children }) {
   const success = useCallback((message, duration) => addToast(message, 'success', duration), [addToast]);
   const error = useCallback((message, duration) => addToast(message, 'error', duration), [addToast]);
   const info = useCallback((message, duration) => addToast(message, 'info', duration), [addToast]);
+  const warning = useCallback((message, duration) => addToast(message, 'warning', duration), [addToast]);
 
   const contextValue = useMemo(
-    () => ({ toasts, addToast, removeToast, success, error, info }),
-    [toasts, addToast, removeToast, success, error, info]
+    () => ({ toasts, addToast, removeToast, success, error, info, warning }),
+    [toasts, addToast, removeToast, success, error, info, warning]
   );
 
   return (

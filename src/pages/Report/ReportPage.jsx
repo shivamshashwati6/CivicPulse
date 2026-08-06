@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/Input';
 import { LocationPicker } from '../../components/common/LocationPicker';
 import { ISSUE_CATEGORIES } from '../../utils/constants';
 import { issueService } from '../../services/issueService';
+import { geminiService } from '../../services/geminiService';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 
@@ -27,6 +28,7 @@ export function ReportPage() {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
 
   const handleLocationChange = ({ latitude: newLat, longitude: newLng, address: newAddress }) => {
     setLatitude(newLat);
@@ -62,6 +64,8 @@ export function ReportPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (isSubmitting || aiAnalyzing) return;
 
     // Form Validation
     if (!imageFile) {
@@ -106,8 +110,8 @@ export function ReportPage() {
         return;
       }
 
-      // Step 2: Create complaint record & complaint_images record in Supabase
-      const { error: createError } = await issueService.createIssue({
+      // Step 2: Create complaint record & complaint_images record in Supabase (status = "Pending")
+      const { data: createData, error: createError } = await issueService.createIssue({
         userId: user.id,
         userEmail: user.email || '',
         userName: user.user_metadata?.full_name || '',
@@ -122,13 +126,31 @@ export function ReportPage() {
         imageUrl: publicUrl,
       });
 
-      if (createError) {
-        toast.error(createError.message || 'Upload Failure: Unable to save complaint.');
+      if (createError || !createData) {
+        toast.error(createError?.message || 'Upload Failure: Unable to save complaint.');
         setIsSubmitting(false);
         return;
       }
 
-      // Step 3: Success toast & redirect to Dashboard
+      const complaintId = createData.id;
+
+      // Requirement 8: Show a loading indicator ("AI is analyzing the uploaded issue...")
+      setAiAnalyzing(true);
+      toast.info('AI is analyzing the uploaded issue...');
+
+      // Step 3: Trigger Google Gemini 2.5 Flash Vision AI analysis
+      const aiResult = await geminiService.processAndSaveAiAnalysis(complaintId, {
+        imageFile,
+        imageUrl: publicUrl,
+      });
+
+      // Requirement 9: Show a success toast after AI completes
+      if (aiResult.success) {
+        toast.success('AI analysis completed successfully.');
+      } else {
+        toast.warning('Complaint saved, but AI analysis failed.');
+      }
+
       toast.success('Upload Success! Complaint reported successfully.');
       navigate('/dashboard');
     } catch (err) {
@@ -136,6 +158,7 @@ export function ReportPage() {
       toast.error(err.message || 'Upload Failure: An unexpected error occurred.');
     } finally {
       setIsSubmitting(false);
+      setAiAnalyzing(false);
     }
   };
 

@@ -294,12 +294,12 @@ export const issueService = {
       }
 
       const finalComplaintObj = {
-        ...fallbackComplaint,
+        ...insertedRecord,
         id: finalId,
         complaint_images: imageUrl ? [{ id: `img_${Date.now()}`, image_url: imageUrl }] : [],
       };
 
-      saveLocalComplaint(finalComplaintObj);
+      // Do NOT call saveLocalComplaint when database insert succeeds to avoid duplicating DB rows with local state
       return { data: finalComplaintObj, error: null };
     } catch (err) {
       console.warn('Network exception during createIssue (Failed to fetch), using resilient local queue:', err);
@@ -333,13 +333,10 @@ export const issueService = {
   },
 
   /**
-   * Fetch user complaints (combining remote Supabase + local cache)
+   * Fetch user complaints directly from Supabase (deduplicated by ID)
    */
   async fetchUserComplaints(userId) {
     const validUserId = toValidUuid(userId);
-    const localData = getLocalComplaints().filter(
-      (c) => c.user_id === validUserId || c.user_id === userId
-    );
 
     try {
       const { data: remoteData, error } = await supabase
@@ -355,10 +352,12 @@ export const issueService = {
         .order('created_at', { ascending: false });
 
       if (!error && remoteData) {
-        // Merge remote and local without duplicates
+        // Deduplicate by complaint ID
         const map = new Map();
-        [...remoteData, ...localData].forEach((item) => {
-          if (!map.has(item.id)) map.set(item.id, item);
+        remoteData.forEach((item) => {
+          if (item && item.id && !map.has(item.id)) {
+            map.set(item.id, item);
+          }
         });
         return { data: Array.from(map.values()), error: null };
       }
@@ -366,15 +365,16 @@ export const issueService = {
       console.warn('Supabase fetchUserComplaints exception (Failed to fetch), returning local complaints:', err);
     }
 
+    const localData = getLocalComplaints().filter(
+      (c) => c.user_id === validUserId || c.user_id === userId
+    );
     return { data: localData, error: null };
   },
 
   /**
-   * Fetch ALL complaints for Admin Control Panel (combining remote Supabase + local cache)
+   * Fetch ALL complaints for Admin Control Panel directly from Supabase (deduplicated by ID)
    */
   async fetchAllComplaints() {
-    const localData = getLocalComplaints();
-
     try {
       const { data: remoteData, error } = await supabase
         .from('complaints')
@@ -393,9 +393,12 @@ export const issueService = {
         .order('created_at', { ascending: false });
 
       if (!error && remoteData) {
+        // Deduplicate by complaint ID
         const map = new Map();
-        [...remoteData, ...localData].forEach((item) => {
-          if (!map.has(item.id)) map.set(item.id, item);
+        remoteData.forEach((item) => {
+          if (item && item.id && !map.has(item.id)) {
+            map.set(item.id, item);
+          }
         });
         return { data: Array.from(map.values()), error: null };
       }
@@ -403,6 +406,7 @@ export const issueService = {
       console.warn('Supabase fetchAllComplaints exception (Failed to fetch), returning local complaints:', err);
     }
 
+    const localData = getLocalComplaints();
     return { data: localData, error: null };
   },
 

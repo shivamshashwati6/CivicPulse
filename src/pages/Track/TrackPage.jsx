@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MapPin, PlusCircle, Calendar, Tag, AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { Search, MapPin, PlusCircle, Calendar, Tag, FileText, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { Card, CardContent } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -17,20 +17,20 @@ export function TrackPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  useEffect(() => {
-    if (user?.id) {
-      loadComplaints();
-    } else {
+  const loadComplaints = useCallback(async () => {
+    if (!user?.id) {
       setLoading(false);
+      return;
     }
-  }, [user]);
-
-  const loadComplaints = async () => {
     setLoading(true);
     const { data } = await issueService.fetchUserComplaints(user.id);
     setComplaints(data || []);
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadComplaints();
+  }, [loadComplaints]);
 
   const filteredComplaints = complaints.filter((c) => {
     const matchesSearch =
