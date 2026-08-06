@@ -21,10 +21,10 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { LocationPicker } from '../../components/common/LocationPicker';
 import { ISSUE_CATEGORIES, SEVERITY_LEVELS } from '../../utils/constants';
-import { analyzeImageWithGemini } from '../../services/geminiService';
+import { analyzeImageWithGemini, geminiService } from '../../services/geminiService';
+import { issueService } from '../../services/issueService';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { supabase } from '../../services/supabaseClient';
 
 export function ReportPage() {
   const { user } = useAuth();
@@ -104,7 +104,7 @@ export function ReportPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Handle Form Submission
+  // Resilient Form Submission Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -122,69 +122,45 @@ export function ReportPage() {
     setIsSubmitting(true);
 
     try {
+      // 1. Upload image via issueService (handles Supabase storage with base64 fallback)
       let uploadedImageUrl = null;
-
-      // 1. Upload Image to Supabase Storage if file is present
       if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('complaints')
-          .upload(filePath, selectedFile);
-
-        if (uploadError) {
-          console.warn('Supabase storage upload error:', uploadError.message);
-        } else {
-          const { data: publicUrlData } = supabase.storage
-            .from('complaints')
-            .getPublicUrl(filePath);
-          uploadedImageUrl = publicUrlData?.publicUrl || null;
-        }
+        const uploadRes = await issueService.uploadComplaintImage(selectedFile, user.id);
+        uploadedImageUrl = uploadRes.publicUrl || null;
       }
 
-      // 2. Insert Complaint Payload into Supabase
-      const payload = {
-        user_id: user.id,
+      // 2. Create Issue Record via issueService (safe schema handling)
+      const { data: createdIssue, error } = await issueService.createIssue({
+        userId: user.id,
+        userEmail: user.email || '',
+        userName: user.user_metadata?.full_name || user.email || 'Citizen User',
         title: title.trim(),
+        description: description.trim(),
         category,
         severity,
-        description: description.trim(),
-        address: locationData.address,
         latitude: locationData.latitude,
         longitude: locationData.longitude,
-        status: 'Pending',
-        upvotes: 1,
-        ai_summary: aiAnalysisResult?.descriptionSummary || null,
-        ai_confidence: aiAnalysisResult?.confidence || null,
-      };
+        address: locationData.address,
+        priority: severity === 'Critical' ? 'High' : severity === 'High' ? 'High' : 'Medium',
+        imageUrl: uploadedImageUrl,
+      });
 
-      const { data: insertedComplaint, error: insertError } = await supabase
-        .from('complaints')
-        .insert([payload])
-        .select()
-        .single();
+      if (error) {
+        toast.error(`Submission failed: ${error.message || 'Server error'}`);
+      } else {
+        // 3. Optional: save AI analysis metadata safely in background if ID exists
+        if (createdIssue?.id && selectedFile) {
+          geminiService.processAndSaveAiAnalysis(createdIssue.id, selectedFile).catch((aiErr) => {
+            console.warn('Background AI analysis update notice:', aiErr);
+          });
+        }
 
-      if (insertError) {
-        throw new Error(insertError.message);
+        toast.success('Civic Issue Report Submitted Successfully!');
+        navigate('/dashboard');
       }
-
-      // 3. Attach uploaded image record if available
-      if (insertedComplaint && uploadedImageUrl) {
-        await supabase.from('complaint_images').insert([
-          {
-            complaint_id: insertedComplaint.id,
-            image_url: uploadedImageUrl,
-          },
-        ]);
-      }
-
-      toast.success('Civic Issue Report Submitted Successfully!');
-      navigate('/dashboard');
     } catch (err) {
-      console.error('Submission error:', err);
-      toast.error(`Submission failed: ${err.message || 'Server error'}`);
+      console.error('Report submission exception:', err);
+      toast.error(`Submission failed: ${err.message || 'Network error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -243,7 +219,7 @@ export function ReportPage() {
                 <button
                   type="button"
                   onClick={handleClearImage}
-                  className="absolute top-3 right-3 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-rose-600 transition-colors"
+                  className="absolute top-3 right-3 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-rose-600 transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
