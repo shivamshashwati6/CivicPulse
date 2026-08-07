@@ -21,8 +21,8 @@ function formatSupabaseUrl(rawUrl) {
   return url;
 }
 
-const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+const rawUrl = import.meta.env.VITE_SUPABASE_URL || 'https://tiecqwgsmdwqklotnqao.supabase.co';
+const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ktQKKLFdIqL14h3-ymB9pQ_QNOIAsBk';
 
 export const supabaseUrl = formatSupabaseUrl(rawUrl);
 export const supabaseAnonKey = rawKey.trim();

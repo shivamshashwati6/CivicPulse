@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -36,7 +35,6 @@ import { Input } from '../../components/ui/Input';
 import { ISSUE_CATEGORIES } from '../../utils/constants';
 import { supabase } from '../../services/supabaseClient';
 import { issueService } from '../../services/issueService';
-import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -97,9 +95,7 @@ const createMarkerIcon = (severity, status) => {
 const CHART_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
 
 export function AdminPage() {
-  const { adminLogout } = useAuth();
   const toast = useToast();
-  const navigate = useNavigate();
   const { theme } = useTheme();
 
   const [complaints, setComplaints] = useState([]);

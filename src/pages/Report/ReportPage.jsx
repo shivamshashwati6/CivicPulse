@@ -4,17 +4,11 @@ import {
   Upload,
   Sparkles,
   MapPin,
-  AlertTriangle,
   Camera,
-  CheckCircle2,
   FileText,
   Send,
   Loader2,
   X,
-  Info,
-  ShieldCheck,
-  Tag,
-  HelpCircle,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
