@@ -80,27 +80,27 @@ export function DashboardPage() {
   }, [loadDashboardData]);
 
   const handleDeleteComplaint = async (complaintId) => {
-    // 1. Optimistic UI deletion: Immediately remove card from state so it disappears instantly
+    // Optimistic UI deletion
     setComplaints((prev) => prev.filter((c) => c.id !== complaintId));
     setConfirmDeleteId(null);
-    toast.success('Report deleted successfully.');
 
-    // 2. Perform background deletion targeting exact ID in Supabase and local queue
+    setDeletingId(complaintId);
     try {
-      setDeletingId(complaintId);
-
-      // Local storage cleanup
-      issueService.deleteComplaint(complaintId, user?.id);
-
-      // Supabase direct query targeting exact complaint ID
+      // Execute direct delete query against Supabase complaints table
       const { error } = await supabase.from('complaints').delete().eq('id', complaintId);
 
+      // Clean local queue backup as well
+      issueService.deleteComplaint(complaintId, user?.id);
+
       if (error) {
-        // Log RLS or query errors gracefully without blocking the user flow with an intrusive toast
-        console.warn(`Supabase delete notice for complaint ${complaintId}:`, error.message || error);
+        console.error('Supabase DB delete complaint error:', error);
+        toast.error(`Database delete warning: ${error.message || 'Permission denied'}`);
+      } else {
+        toast.success('Report deleted successfully.');
       }
     } catch (err) {
-      console.warn('Exception during complaint deletion:', err);
+      console.error('Exception during complaint deletion:', err);
+      toast.error('Deletion error occurred.');
     } finally {
       setDeletingId(null);
     }

@@ -27,6 +27,7 @@ import {
   Flame,
   Activity,
   Filter,
+  Trash2,
 } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -134,10 +135,28 @@ export function AdminPage() {
     fetchComplaintsDirectly();
 
     const channel = supabase
-      .channel('admin-authority-live-channel')
+      .channel('admin-complaints-changes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'complaints' },
+        { event: 'DELETE', schema: 'public', table: 'complaints' },
+        (payload) => {
+          if (payload?.old?.id) {
+            setComplaints((prev) => prev.filter((c) => c.id !== payload.old.id));
+          } else {
+            fetchComplaintsDirectly();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'complaints' },
+        () => {
+          fetchComplaintsDirectly();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'complaints' },
         () => {
           fetchComplaintsDirectly();
         }
@@ -169,6 +188,21 @@ export function AdminPage() {
       toast.error('Failed to update status');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleAdminDelete = async (complaintId) => {
+    setComplaints((prev) => prev.filter((c) => c.id !== complaintId));
+    toast.success('Complaint dismissed and removed from queue.');
+
+    try {
+      const { error } = await supabase.from('complaints').delete().eq('id', complaintId);
+      issueService.deleteComplaint(complaintId);
+      if (error) {
+        console.error('Admin delete complaint error:', error);
+      }
+    } catch (err) {
+      console.error('Admin delete complaint exception:', err);
     }
   };
 
@@ -636,24 +670,36 @@ export function AdminPage() {
                         </span>
                       </td>
 
-                      {/* Interactive Status Dropdown Action */}
+                      {/* Interactive Status Dropdown & Delete Action */}
                       <td className="py-4 px-4 text-right">
-                        {isUpdatingThis ? (
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 dark:text-slate-400 font-medium">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 dark:text-blue-400" />
-                            Updating...
-                          </div>
-                        ) : (
-                          <select
-                            value={item.status || 'Pending'}
-                            onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:dark:border-blue-500 focus:dark:ring-1 focus:dark:ring-blue-500 transition-colors cursor-pointer"
+                        <div className="flex items-center justify-end gap-2">
+                          {isUpdatingThis ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 dark:text-slate-400 font-medium">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 dark:text-blue-400" />
+                              Updating...
+                            </div>
+                          ) : (
+                            <select
+                              value={item.status || 'Pending'}
+                              onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                              className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:dark:border-blue-500 focus:dark:ring-1 focus:dark:ring-blue-500 transition-colors cursor-pointer"
+                            >
+                              <option value="Pending">⚡ Pending</option>
+                              <option value="In Progress">🛠️ In Progress</option>
+                              <option value="Resolved">✅ Resolved</option>
+                            </select>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleAdminDelete(item.id)}
+                            className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 hover:bg-rose-500/20 text-slate-500 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700/80 transition-colors cursor-pointer"
+                            title="Delete / Dismiss Ticket"
+                            aria-label="Delete or dismiss complaint"
                           >
-                            <option value="Pending">⚡ Pending</option>
-                            <option value="In Progress">🛠️ In Progress</option>
-                            <option value="Resolved">✅ Resolved</option>
-                          </select>
-                        )}
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
