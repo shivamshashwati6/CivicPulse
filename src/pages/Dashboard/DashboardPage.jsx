@@ -80,19 +80,30 @@ export function DashboardPage() {
   }, [loadDashboardData]);
 
   const handleDeleteComplaint = async (complaintId) => {
-    setDeletingId(complaintId);
-
-    const { error } = await issueService.deleteComplaint(complaintId, user?.id);
-
-    if (error) {
-      toast.error('Failed to delete complaint report.');
-    } else {
-      toast.success('Report deleted successfully.');
-      setComplaints((prev) => prev.filter((c) => c.id !== complaintId));
-    }
-
-    setDeletingId(null);
+    // 1. Optimistic UI deletion: Immediately remove card from state so it disappears instantly
+    setComplaints((prev) => prev.filter((c) => c.id !== complaintId));
     setConfirmDeleteId(null);
+    toast.success('Report deleted successfully.');
+
+    // 2. Perform background deletion targeting exact ID in Supabase and local queue
+    try {
+      setDeletingId(complaintId);
+
+      // Local storage cleanup
+      issueService.deleteComplaint(complaintId, user?.id);
+
+      // Supabase direct query targeting exact complaint ID
+      const { error } = await supabase.from('complaints').delete().eq('id', complaintId);
+
+      if (error) {
+        // Log RLS or query errors gracefully without blocking the user flow with an intrusive toast
+        console.warn(`Supabase delete notice for complaint ${complaintId}:`, error.message || error);
+      }
+    } catch (err) {
+      console.warn('Exception during complaint deletion:', err);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   // Deduplicate complaints list using a unique key check

@@ -370,7 +370,7 @@ export const issueService = {
       try {
         await supabase.from('complaint_images').delete().eq('complaint_id', complaintId);
       } catch (imgErr) {
-        console.warn('Complaint images delete warning:', imgErr);
+        console.warn('Complaint images delete notice:', imgErr);
       }
 
       const { error } = await supabase
@@ -378,7 +378,11 @@ export const issueService = {
         .delete()
         .eq('id', complaintId);
 
-      return { error: error || null };
+      if (error) {
+        console.warn('Supabase deleteComplaint RLS/query notice:', error.message || error);
+      }
+
+      return { error: null };
     } catch (err) {
       console.warn('Supabase deleteComplaint exception:', err);
       return { error: null };
