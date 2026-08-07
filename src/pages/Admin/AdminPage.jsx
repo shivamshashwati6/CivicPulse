@@ -135,35 +135,45 @@ export function AdminPage() {
     fetchComplaintsDirectly();
 
     const channel = supabase
-      .channel('admin-complaints-changes')
+      .channel('admin-realtime-complaints')
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'complaints' },
-        (payload) => {
-          if (payload?.old?.id) {
+        { event: '*', schema: 'public', table: 'complaints' },
+        async (payload) => {
+          console.log('Realtime postgres_changes event in AdminPage:', payload);
+
+          if (payload.eventType === 'INSERT' && payload.new?.id) {
+            try {
+              const { data: newItem } = await issueService.fetchIssueById(payload.new.id);
+              const itemToAdd = newItem || payload.new;
+              setComplaints((prev) => {
+                if (prev.some((c) => c.id === itemToAdd.id)) {
+                  return prev.map((c) => (c.id === itemToAdd.id ? { ...c, ...itemToAdd } : c));
+                }
+                return [itemToAdd, ...prev];
+              });
+            } catch (fetchErr) {
+              console.warn('Realtime INSERT item fetch warning:', fetchErr);
+              setComplaints((prev) => {
+                if (prev.some((c) => c.id === payload.new.id)) return prev;
+                return [payload.new, ...prev];
+              });
+            }
+          } else if (payload.eventType === 'UPDATE' && payload.new?.id) {
+            setComplaints((prev) =>
+              prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } : c))
+            );
+          } else if (payload.eventType === 'DELETE' && payload.old?.id) {
             setComplaints((prev) => prev.filter((c) => c.id !== payload.old.id));
-          } else {
-            fetchComplaintsDirectly();
           }
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'complaints' },
-        () => {
-          fetchComplaintsDirectly();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'complaints' },
-        () => {
-          fetchComplaintsDirectly();
-        }
-      )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           setRealtimeConnected(true);
+        }
+        if (err) {
+          console.error('Admin Realtime subscription error:', err);
         }
       });
 

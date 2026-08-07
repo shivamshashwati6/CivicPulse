@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { ISSUE_CATEGORIES } from '../../utils/constants';
 import { issueService } from '../../services/issueService';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../services/supabaseClient';
 
 export function TrackPage() {
   const { user } = useAuth();
@@ -30,7 +31,51 @@ export function TrackPage() {
 
   useEffect(() => {
     loadComplaints();
-  }, [loadComplaints]);
+
+    const currentUserId = user?.id;
+
+    const channel = supabase
+      .channel(`citizen-track-realtime-${currentUserId || 'guest'}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'complaints' },
+        async (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new?.id) {
+            const isUserComplaint = !currentUserId || payload.new.user_id === currentUserId;
+            if (isUserComplaint) {
+              try {
+                const { data: newItem } = await issueService.fetchIssueById(payload.new.id);
+                const itemToAdd = newItem || payload.new;
+                setComplaints((prev) => {
+                  if (prev.some((c) => c.id === itemToAdd.id)) return prev;
+                  return [itemToAdd, ...prev];
+                });
+              } catch {
+                setComplaints((prev) => {
+                  if (prev.some((c) => c.id === payload.new.id)) return prev;
+                  return [payload.new, ...prev];
+                });
+              }
+            }
+          } else if (payload.eventType === 'UPDATE' && payload.new?.id) {
+            setComplaints((prev) =>
+              prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } : c))
+            );
+          } else if (payload.eventType === 'DELETE' && payload.old?.id) {
+            setComplaints((prev) => prev.filter((c) => c.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (err) {
+          console.error('Track Page Realtime error:', err);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadComplaints, user?.id]);
 
   const filteredComplaints = complaints.filter((c) => {
     const matchesSearch =
