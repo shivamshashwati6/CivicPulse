@@ -103,6 +103,7 @@ export function ReportPage() {
   // Resilient Form Submission Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     if (!title.trim() || !description.trim()) {
       toast.error('Please enter an issue title and description.');
@@ -360,12 +361,12 @@ export function ReportPage() {
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 flex items-center justify-center cursor-pointer transition-all"
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 flex items-center justify-center cursor-pointer transition-all"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Dispatching Ticket Payload...
+                Submitting Report...
               </>
             ) : (
               <>

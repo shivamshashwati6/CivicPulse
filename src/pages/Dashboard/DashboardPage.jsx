@@ -80,10 +80,9 @@ export function DashboardPage() {
   }, [loadDashboardData]);
 
   const handleDeleteComplaint = async (complaintId) => {
-    if (!user?.id) return;
     setDeletingId(complaintId);
 
-    const { error } = await issueService.deleteComplaint(complaintId, user.id);
+    const { error } = await issueService.deleteComplaint(complaintId, user?.id);
 
     if (error) {
       toast.error('Failed to delete complaint report.');
@@ -96,15 +95,25 @@ export function DashboardPage() {
     setConfirmDeleteId(null);
   };
 
-  // Compute metric totals from real Supabase user complaints
-  const totalReports = complaints.length;
-  const pendingCount = complaints.filter(
+  // Deduplicate complaints list using a unique key check
+  const uniqueComplaints = Array.from(
+    (complaints || []).reduce((acc, item) => {
+      if (item && item.id && !acc.has(item.id)) {
+        acc.set(item.id, item);
+      }
+      return acc;
+    }, new Map()).values()
+  );
+
+  // Compute metric totals from deduplicated complaints
+  const totalReports = uniqueComplaints.length;
+  const pendingCount = uniqueComplaints.filter(
     (c) => (c.status || '').toLowerCase() === 'pending'
   ).length;
-  const inProgressCount = complaints.filter(
+  const inProgressCount = uniqueComplaints.filter(
     (c) => (c.status || '').toLowerCase() === 'in progress'
   ).length;
-  const resolvedCount = complaints.filter(
+  const resolvedCount = uniqueComplaints.filter(
     (c) => (c.status || '').toLowerCase() === 'resolved'
   ).length;
 
@@ -206,7 +215,7 @@ export function DashboardPage() {
             <CardTitle>Recent Issue Reports</CardTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Your live complaints ordered by newest first</p>
           </div>
-          {complaints.length > 0 && (
+          {uniqueComplaints.length > 0 && (
             <Link to="/track" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 flex items-center">
               View All Reports <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
             </Link>
@@ -227,7 +236,7 @@ export function DashboardPage() {
                 </div>
               ))}
             </div>
-          ) : complaints.length === 0 ? (
+          ) : uniqueComplaints.length === 0 ? (
             /* Empty State */
             <div className="py-12 text-center">
               <div className="max-w-xs mx-auto space-y-3">
@@ -249,7 +258,7 @@ export function DashboardPage() {
           ) : (
             /* Real User Complaints List */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {complaints.map((item) => {
+              {uniqueComplaints.map((item) => {
                 const imageUrl = item.complaint_images?.[0]?.image_url;
                 const formattedDate = new Date(item.created_at).toLocaleDateString('en-US', {
                   month: 'short',
