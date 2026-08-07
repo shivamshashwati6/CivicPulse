@@ -39,20 +39,11 @@ function deleteLocalComplaint(complaintId) {
 }
 
 /**
- * Deterministically convert any user ID or string into a valid PostgreSQL UUID v4 format
+ * Helper to validate if a string is a standard UUID format
  */
-function toValidUuid(idStr) {
-  if (!idStr) return '00000000-0000-0000-0000-000000000000';
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (uuidRegex.test(idStr)) {
-    return idStr;
-  }
-  let hex = '';
-  for (let i = 0; i < idStr.length; i++) {
-    hex += idStr.charCodeAt(i).toString(16);
-  }
-  hex = (hex + '00000000000000000000000000000000').substring(0, 32);
-  return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-4${hex.substring(13, 16)}-a${hex.substring(17, 20)}-${hex.substring(20, 32)}`;
+function isValidUuid(idStr) {
+  if (!idStr || typeof idStr !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr);
 }
 
 export const issueService = {
@@ -192,9 +183,9 @@ export const issueService = {
     }
 
     try {
-      const validUserId = toValidUuid(userId);
+      const folderId = isValidUuid(userId) ? userId : 'anonymous';
       const fileExt = file.name ? file.name.split('.').pop() : 'jpg';
-      const fileName = `${validUserId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const fileName = `${folderId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
       const filePath = `${fileName}`;
 
       const { data, error } = await supabase.storage
@@ -237,11 +228,33 @@ export const issueService = {
     priority = 'Medium',
     imageUrl = null,
   }) {
-    const validUserId = toValidUuid(userId);
+    let activeUserId = null;
+    let activeUserEmail = userEmail;
+    let activeUserName = userName;
+
+    // Dynamically retrieve authenticated user from supabase.auth.getUser()
+    try {
+      const { data: authUserData } = await supabase.auth.getUser();
+      if (authUserData?.user?.id) {
+        activeUserId = authUserData.user.id;
+        if (authUserData.user.email) activeUserEmail = authUserData.user.email;
+        const metaName =
+          authUserData.user.user_metadata?.full_name ||
+          authUserData.user.user_metadata?.name;
+        if (metaName) activeUserName = metaName;
+      }
+    } catch (authErr) {
+      console.warn('Could not fetch active user from supabase.auth.getUser():', authErr);
+    }
+
+    // Fall back to passed userId if it is a valid UUID
+    if (!activeUserId && isValidUuid(userId)) {
+      activeUserId = userId;
+    }
 
     const complaintObj = {
       id: `cmp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      user_id: validUserId,
+      user_id: activeUserId || userId || 'anonymous',
       title,
       description,
       category,
@@ -255,13 +268,22 @@ export const issueService = {
       updated_at: new Date().toISOString(),
       complaint_images: imageUrl ? [{ id: `img_${Date.now()}`, image_url: imageUrl }] : [],
       profiles: {
-        email: userEmail,
-        full_name: userName,
+        email: activeUserEmail,
+        full_name: activeUserName,
       },
     };
 
     // Always save local backup so complaint is immediately available on citizen dashboard and admin panel
     saveLocalComplaint(complaintObj);
+
+    // If no valid auth.users UUID exists, return local object without attempting remote FK-violating insert
+    if (!activeUserId || !isValidUuid(activeUserId)) {
+      console.warn('No valid auth.users UUID found for complaint insert; complaint saved to local storage.');
+      return {
+        data: complaintObj,
+        error: new Error('Please log in with a valid account to sync report to cloud database.'),
+      };
+    }
 
     try {
       // Step 1: Ensure user profile row exists in public.profiles table
@@ -269,9 +291,9 @@ export const issueService = {
         await supabase.from('profiles').upsert(
           [
             {
-              id: validUserId,
-              email: userEmail,
-              full_name: userName,
+              id: activeUserId,
+              email: activeUserEmail,
+              full_name: activeUserName,
             },
           ],
           { onConflict: 'id' }
@@ -285,7 +307,7 @@ export const issueService = {
         .from('complaints')
         .insert([
           {
-            user_id: validUserId,
+            user_id: activeUserId,
             title,
             description,
             category,
@@ -326,8 +348,8 @@ export const issueService = {
         id: finalId,
         complaint_images: imageUrl ? [{ id: `img_${Date.now()}`, image_url: imageUrl }] : [],
         profiles: {
-          email: userEmail,
-          full_name: userName,
+          email: activeUserEmail,
+          full_name: activeUserName,
         },
       };
 

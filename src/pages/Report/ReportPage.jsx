@@ -20,6 +20,8 @@ import { issueService } from '../../services/issueService';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 
+import { supabase } from '../../services/supabaseClient';
+
 export function ReportPage() {
   const { user } = useAuth();
   const toast = useToast();
@@ -107,7 +109,18 @@ export function ReportPage() {
       return;
     }
 
-    if (!user) {
+    // Dynamically retrieve authenticated user session from Supabase
+    let activeUser = user;
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user?.id) {
+        activeUser = authData.user;
+      }
+    } catch (authErr) {
+      console.warn('Could not fetch active user from supabase.auth.getUser():', authErr);
+    }
+
+    if (!activeUser || !activeUser.id) {
       toast.error('Please log in to submit a complaint.');
       navigate('/login');
       return;
@@ -119,15 +132,15 @@ export function ReportPage() {
       // 1. Upload image via issueService (handles Supabase storage with base64 fallback)
       let uploadedImageUrl = null;
       if (selectedFile) {
-        const uploadRes = await issueService.uploadComplaintImage(selectedFile, user.id);
+        const uploadRes = await issueService.uploadComplaintImage(selectedFile, activeUser.id);
         uploadedImageUrl = uploadRes.publicUrl || null;
       }
 
       // 2. Create Issue Record via issueService (safe schema handling)
       const { data: createdIssue, error } = await issueService.createIssue({
-        userId: user.id,
-        userEmail: user.email || '',
-        userName: user.user_metadata?.full_name || user.email || 'Citizen User',
+        userId: activeUser.id,
+        userEmail: activeUser.email || '',
+        userName: activeUser.user_metadata?.full_name || activeUser.user_metadata?.name || activeUser.email || 'Citizen User',
         title: title.trim(),
         description: description.trim(),
         category,
@@ -139,7 +152,7 @@ export function ReportPage() {
         imageUrl: uploadedImageUrl,
       });
 
-      if (error) {
+      if (error && (!createdIssue || !createdIssue.id)) {
         toast.error(`Submission failed: ${error.message || 'Server error'}`);
       } else {
         // 3. Optional: save AI analysis metadata safely in background if ID exists
