@@ -45,12 +45,7 @@ export function DashboardPage() {
       setComplaints(fetchedComplaints);
     } catch (err) {
       console.error('Error fetching citizen dashboard complaints:', err);
-      try {
-        const local = issueService.getLocalComplaints ? issueService.getLocalComplaints() : [];
-        setComplaints(local);
-      } catch {
-        setComplaints([]);
-      }
+      setComplaints([]);
     } finally {
       // Ensure skeleton loaders unmount regardless of fetch success or empty arrays
       setLoading(false);

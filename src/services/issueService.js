@@ -1,43 +1,5 @@
 import { supabase } from './supabaseClient';
 
-const LOCAL_COMPLAINTS_KEY = 'civicpulse_local_complaints';
-
-function getLocalComplaints() {
-  try {
-    const raw = localStorage.getItem(LOCAL_COMPLAINTS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalComplaint(complaintObj) {
-  try {
-    const current = getLocalComplaints();
-    const existsIndex = current.findIndex((c) => c.id === complaintObj.id);
-    let updated;
-    if (existsIndex >= 0) {
-      updated = [...current];
-      updated[existsIndex] = { ...updated[existsIndex], ...complaintObj };
-    } else {
-      updated = [complaintObj, ...current];
-    }
-    localStorage.setItem(LOCAL_COMPLAINTS_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Error saving local complaint:', e);
-  }
-}
-
-function deleteLocalComplaint(complaintId) {
-  try {
-    const current = getLocalComplaints();
-    const updated = current.filter((c) => c.id !== complaintId);
-    localStorage.setItem(LOCAL_COMPLAINTS_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.warn('Error deleting local complaint:', e);
-  }
-}
-
 /**
  * Helper to validate if a string is a standard UUID format
  */
@@ -165,7 +127,7 @@ export const issueService = {
   },
 
   /**
-   * Upload complaint photo to Supabase Storage bucket "complaints" with permanent base64 fallback
+   * Upload complaint photo directly to Supabase Storage bucket "complaints"
    */
   async uploadComplaintImage(file, userId) {
     if (!file) return { publicUrl: null, error: null };
@@ -206,13 +168,13 @@ export const issueService = {
 
       return { publicUrl: publicUrlData?.publicUrl || base64Url, error: null };
     } catch (err) {
-      console.warn('Supabase storage upload exception (Failed to fetch), using base64 fallback:', err);
+      console.warn('Supabase storage upload exception, using base64 fallback:', err);
       return { publicUrl: base64Url || (file ? URL.createObjectURL(file) : null), error: null };
     }
   },
 
   /**
-   * Create a new complaint record with graceful network & local storage sync
+   * Create a new complaint record directly in Supabase database complaints table
    */
   async createIssue({
     userId,
@@ -247,41 +209,14 @@ export const issueService = {
       console.warn('Could not fetch active user from supabase.auth.getUser():', authErr);
     }
 
-    // Fall back to passed userId if it is a valid UUID
     if (!activeUserId && isValidUuid(userId)) {
       activeUserId = userId;
     }
 
-    const complaintObj = {
-      id: `cmp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      user_id: activeUserId || userId || 'anonymous',
-      title,
-      description,
-      category,
-      severity,
-      latitude,
-      longitude,
-      address,
-      status: 'Pending',
-      priority,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      complaint_images: imageUrl ? [{ id: `img_${Date.now()}`, image_url: imageUrl }] : [],
-      profiles: {
-        email: activeUserEmail,
-        full_name: activeUserName,
-      },
-    };
-
-    // Always save local backup so complaint is immediately available on citizen dashboard and admin panel
-    saveLocalComplaint(complaintObj);
-
-    // If no valid auth.users UUID exists, return local object without attempting remote FK-violating insert
     if (!activeUserId || !isValidUuid(activeUserId)) {
-      console.warn('No valid auth.users UUID found for complaint insert; complaint saved to local storage.');
       return {
-        data: complaintObj,
-        error: new Error('Please log in with a valid account to sync report to cloud database.'),
+        data: null,
+        error: new Error('Please log in with an authenticated account to submit a report.'),
       };
     }
 
@@ -302,7 +237,7 @@ export const issueService = {
         console.warn('Profile upsert warning (non-fatal):', profileErr);
       }
 
-      // Step 2: Insert complaint row into public.complaints
+      // Step 2: Insert complaint row directly into public.complaints
       const { data: complaintData, error: complaintError } = await supabase
         .from('complaints')
         .insert([
@@ -323,13 +258,13 @@ export const issueService = {
 
       if (complaintError) {
         console.error('Supabase DB complaint insert failed:', complaintError);
-        return { data: complaintObj, error: complaintError };
+        return { data: null, error: complaintError };
       }
 
       const insertedRecord = Array.isArray(complaintData) ? complaintData[0] : complaintData;
-      const finalId = insertedRecord?.id || complaintObj.id;
+      const finalId = insertedRecord?.id;
 
-      // Step 3: Insert image record into public.complaint_images
+      // Step 3: Insert image record into public.complaint_images if image provided
       if (imageUrl && finalId) {
         try {
           await supabase.from('complaint_images').insert([
@@ -345,7 +280,6 @@ export const issueService = {
 
       const finalComplaintObj = {
         ...insertedRecord,
-        id: finalId,
         complaint_images: imageUrl ? [{ id: `img_${Date.now()}`, image_url: imageUrl }] : [],
         profiles: {
           email: activeUserEmail,
@@ -353,19 +287,19 @@ export const issueService = {
         },
       };
 
-      saveLocalComplaint(finalComplaintObj);
       return { data: finalComplaintObj, error: null };
     } catch (err) {
-      console.warn('Network exception during createIssue, saved to resilient local queue:', err);
-      return { data: complaintObj, error: null };
+      console.error('Exception during createIssue DB insert:', err);
+      return { data: null, error: err };
     }
   },
 
   /**
-   * Delete a complaint by ID directly in Supabase and local storage
+   * Delete a complaint directly by ID in Supabase
    */
   async deleteComplaint(complaintId) {
-    deleteLocalComplaint(complaintId);
+    if (!complaintId) return { error: null };
+
     try {
       try {
         await supabase.from('complaint_images').delete().eq('complaint_id', complaintId);
@@ -379,73 +313,53 @@ export const issueService = {
         .eq('id', complaintId);
 
       if (error) {
-        console.warn('Supabase deleteComplaint RLS/query notice:', error.message || error);
+        console.error('Supabase deleteComplaint error:', error);
       }
 
-      return { error: null };
+      return { error: error || null };
     } catch (err) {
-      console.warn('Supabase deleteComplaint exception:', err);
-      return { error: null };
+      console.error('Supabase deleteComplaint exception:', err);
+      return { error: err };
     }
   },
 
   /**
-   * Fetch user complaints (combines remote Supabase and local storage, deduplicated)
+   * Fetch user complaints directly from Supabase complaints table
    */
   async fetchUserComplaints(userId) {
-    const localData = getLocalComplaints().filter(
-      (c) => c.user_id === userId || (c.user_id && c.user_id === userId)
-    );
-
-    const map = new Map();
-    localData.forEach((item) => {
-      if (item && item.id) {
-        map.set(item.id, item);
-      }
-    });
-
-    if (userId && isValidUuid(userId)) {
-      try {
-        const { data: remoteData, error } = await supabase
-          .from('complaints')
-          .select(`
-            *,
-            complaint_images (
-              id,
-              image_url
-            )
-          `)
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-
-        if (!error && remoteData) {
-          remoteData.forEach((item) => {
-            if (item && item.id) {
-              map.set(item.id, item);
-            }
-          });
-        }
-      } catch (err) {
-        console.warn('Supabase fetchUserComplaints exception:', err);
-      }
+    if (!userId || !isValidUuid(userId)) {
+      return { data: [], error: null };
     }
 
-    return { data: Array.from(map.values()), error: null };
+    try {
+      const { data: remoteData, error } = await supabase
+        .from('complaints')
+        .select(`
+          *,
+          complaint_images (
+            id,
+            image_url
+          )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Supabase fetchUserComplaints query error:', error);
+        return { data: [], error };
+      }
+
+      return { data: remoteData || [], error: null };
+    } catch (err) {
+      console.error('Supabase fetchUserComplaints exception:', err);
+      return { data: [], error: err };
+    }
   },
 
   /**
-   * Fetch ALL complaints for Admin Control Panel (combines remote Supabase and local storage, deduplicated)
+   * Fetch ALL complaints directly from Supabase complaints table for Admin Control Panel
    */
   async fetchAllComplaints() {
-    const localData = getLocalComplaints();
-    const map = new Map();
-
-    localData.forEach((item) => {
-      if (item && item.id) {
-        map.set(item.id, item);
-      }
-    });
-
     try {
       let { data: remoteData, error } = await supabase
         .from('complaints')
@@ -465,7 +379,7 @@ export const issueService = {
         .order('created_at', { ascending: false });
 
       if (error) {
-        const { data: rawComplaints } = await supabase
+        const { data: rawComplaints, error: rawError } = await supabase
           .from('complaints')
           .select(`
             *,
@@ -475,36 +389,25 @@ export const issueService = {
             )
           `)
           .order('created_at', { ascending: false });
-        
-        remoteData = rawComplaints || [];
+
+        if (!rawError && rawComplaints) {
+          return { data: rawComplaints, error: null };
+        }
       }
 
-      if (remoteData && remoteData.length > 0) {
-        remoteData.forEach((item) => {
-          if (item && item.id) {
-            map.set(item.id, item);
-          }
-        });
-      }
+      return { data: remoteData || [], error: error || null };
     } catch (err) {
-      console.warn('Supabase fetchAllComplaints exception:', err);
+      console.error('Supabase fetchAllComplaints exception:', err);
+      return { data: [], error: err };
     }
-
-    return { data: Array.from(map.values()), error: null };
   },
 
   /**
-   * Update complaint status
+   * Update complaint status directly in Supabase
    */
   async updateComplaintStatus(complaintId, newStatus, oldStatus = 'Pending', adminId = null) {
-    const local = getLocalComplaints();
-    const target = local.find((c) => c.id === complaintId);
-    if (target) {
-      saveLocalComplaint({ ...target, status: newStatus });
-    }
-
     try {
-      const validAdminId = adminId ? toValidUuid(adminId) : null;
+      const validAdminId = adminId && isValidUuid(adminId) ? adminId : null;
       const { data, error } = await supabase
         .from('complaints')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -526,20 +429,17 @@ export const issueService = {
         }
       }
 
-      return { data, error: null };
+      return { data, error: error || null };
     } catch (err) {
-      console.warn('Supabase updateComplaintStatus exception:', err);
-      return { data: null, error: null };
+      console.error('Supabase updateComplaintStatus exception:', err);
+      return { data: null, error: err };
     }
   },
 
   /**
-   * Fetch single complaint by ID
+   * Fetch single complaint by ID directly from Supabase
    */
   async fetchIssueById(id) {
-    const local = getLocalComplaints().find((c) => c.id === id);
-    if (local) return { data: local, error: null };
-
     try {
       const { data, error } = await supabase
         .from('complaints')
@@ -562,9 +462,8 @@ export const issueService = {
       if (error) throw error;
       return { data, error: null };
     } catch (err) {
-      return { data: local || null, error: err };
+      console.error('fetchIssueById error:', err);
+      return { data: null, error: err };
     }
   },
-
-  getLocalComplaints,
 };
