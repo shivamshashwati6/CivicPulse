@@ -389,9 +389,8 @@ export const issueService = {
    * Fetch user complaints (combines remote Supabase and local storage, deduplicated)
    */
   async fetchUserComplaints(userId) {
-    const validUserId = toValidUuid(userId);
     const localData = getLocalComplaints().filter(
-      (c) => c.user_id === validUserId || c.user_id === userId
+      (c) => c.user_id === userId || (c.user_id && c.user_id === userId)
     );
 
     const map = new Map();
@@ -401,28 +400,30 @@ export const issueService = {
       }
     });
 
-    try {
-      const { data: remoteData, error } = await supabase
-        .from('complaints')
-        .select(`
-          *,
-          complaint_images (
-            id,
-            image_url
-          )
-        `)
-        .or(`user_id.eq.${validUserId},user_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
+    if (userId && isValidUuid(userId)) {
+      try {
+        const { data: remoteData, error } = await supabase
+          .from('complaints')
+          .select(`
+            *,
+            complaint_images (
+              id,
+              image_url
+            )
+          `)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
 
-      if (!error && remoteData) {
-        remoteData.forEach((item) => {
-          if (item && item.id) {
-            map.set(item.id, item);
-          }
-        });
+        if (!error && remoteData) {
+          remoteData.forEach((item) => {
+            if (item && item.id) {
+              map.set(item.id, item);
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Supabase fetchUserComplaints exception:', err);
       }
-    } catch (err) {
-      console.warn('Supabase fetchUserComplaints exception:', err);
     }
 
     return { data: Array.from(map.values()), error: null };
@@ -560,4 +561,6 @@ export const issueService = {
       return { data: local || null, error: err };
     }
   },
+
+  getLocalComplaints,
 };

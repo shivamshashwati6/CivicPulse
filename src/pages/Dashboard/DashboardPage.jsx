@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { issueService } from '../../services/issueService';
+import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 
@@ -18,19 +19,54 @@ export function DashboardPage() {
   const [deletingId, setDeletingId] = useState(null);
 
   const loadDashboardData = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
-    const { data } = await issueService.fetchUserComplaints(user.id);
-    setComplaints(data || []);
-    setLoading(false);
+    try {
+      // Safely resolve active user session ID
+      let currentUserId = user?.id;
+      if (!currentUserId) {
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          currentUserId = authData?.user?.id;
+        } catch (e) {
+          console.warn('Dashboard auth user fetch notice:', e);
+        }
+      }
+
+      let fetchedComplaints = [];
+      if (currentUserId) {
+        const { data } = await issueService.fetchUserComplaints(currentUserId);
+        fetchedComplaints = data || [];
+      } else {
+        // Fallback gracefully if no user session exists
+        const { data } = await issueService.fetchAllComplaints();
+        fetchedComplaints = data || [];
+      }
+
+      setComplaints(fetchedComplaints);
+    } catch (err) {
+      console.error('Error fetching citizen dashboard complaints:', err);
+      try {
+        const local = issueService.getLocalComplaints ? issueService.getLocalComplaints() : [];
+        setComplaints(local);
+      } catch {
+        setComplaints([]);
+      }
+    } finally {
+      // Ensure skeleton loaders unmount regardless of fetch success or empty arrays
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
-    loadDashboardData();
+    let active = true;
+
+    const fetchData = async () => {
+      if (active) {
+        await loadDashboardData();
+      }
+    };
+
+    fetchData();
 
     const handleFocus = () => {
       loadDashboardData();
@@ -38,6 +74,7 @@ export function DashboardPage() {
 
     window.addEventListener('focus', handleFocus);
     return () => {
+      active = false;
       window.removeEventListener('focus', handleFocus);
     };
   }, [loadDashboardData]);
