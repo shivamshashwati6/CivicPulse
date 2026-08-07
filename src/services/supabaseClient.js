@@ -13,7 +13,7 @@ function formatSupabaseUrl(rawUrl) {
     if (!parsed.hostname.includes('.')) {
       return `${parsed.protocol}//${parsed.hostname}.supabase.co`;
     }
-  } catch (e) {
+  } catch {
     if (!url.includes('.')) {
       return url + '.supabase.co';
     }

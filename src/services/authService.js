@@ -6,7 +6,7 @@ function getStoredLocalUser() {
   try {
     const raw = localStorage.getItem(LOCAL_USER_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -131,9 +131,9 @@ export const authService = {
   async signOut() {
     removeStoredLocalUser();
     try {
-      const { error } = await supabase.auth.signOut();
+      await supabase.auth.signOut();
       return { error: null };
-    } catch (e) {
+    } catch {
       return { error: null };
     }
   },

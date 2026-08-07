@@ -6,7 +6,7 @@ function getLocalComplaints() {
   try {
     const raw = localStorage.getItem(LOCAL_COMPLAINTS_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch (e) {
+  } catch {
     return [];
   }
 }

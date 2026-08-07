@@ -15,17 +15,25 @@ export function LocationMap({ latitude, longitude, onLocationSelect, height = '2
   const leafletMapRef = useRef(null);
   const markerRef = useRef(null);
 
+  const initialLatRef = useRef(latitude);
+  const initialLngRef = useRef(longitude);
+
+  const onLocationSelectRef = useRef(onLocationSelect);
+  useEffect(() => {
+    onLocationSelectRef.current = onLocationSelect;
+  }, [onLocationSelect]);
+
   // Initialize Map
   useEffect(() => {
     if (!mapRef.current) return;
 
-    const defaultLat = latitude || 28.6139; // Default fallback (e.g. New Delhi)
-    const defaultLng = longitude || 77.2090;
+    const defaultLat = initialLatRef.current || 28.6139; // Default fallback (e.g. New Delhi)
+    const defaultLng = initialLngRef.current || 77.2090;
 
     if (!leafletMapRef.current) {
       const map = L.map(mapRef.current, {
         center: [defaultLat, defaultLng],
-        zoom: latitude && longitude ? 15 : 12,
+        zoom: initialLatRef.current && initialLngRef.current ? 15 : 12,
         zoomControl: true,
       });
 
@@ -41,8 +49,8 @@ export function LocationMap({ latitude, longitude, onLocationSelect, height = '2
       // Handle marker drag
       marker.on('dragend', () => {
         const position = marker.getLatLng();
-        if (onLocationSelect) {
-          onLocationSelect({ lat: position.lat, lng: position.lng });
+        if (onLocationSelectRef.current) {
+          onLocationSelectRef.current({ lat: position.lat, lng: position.lng });
         }
       });
 
@@ -50,8 +58,8 @@ export function LocationMap({ latitude, longitude, onLocationSelect, height = '2
       map.on('click', (e) => {
         const { lat, lng } = e.latlng;
         marker.setLatLng([lat, lng]);
-        if (onLocationSelect) {
-          onLocationSelect({ lat, lng });
+        if (onLocationSelectRef.current) {
+          onLocationSelectRef.current({ lat, lng });
         }
       });
 
