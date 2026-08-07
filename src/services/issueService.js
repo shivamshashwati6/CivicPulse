@@ -10,16 +10,20 @@ function isValidUuid(idStr) {
 
 export const issueService = {
   /**
-   * Reverse geocode latitude and longitude with fallback APIs
+   * Reverse geocode latitude and longitude using OpenStreetMap Nominatim
    */
   async reverseGeocode(lat, lon) {
+    if (lat === null || lat === undefined || lon === null || lon === undefined) {
+      return { address: '', error: new Error('Invalid coordinates') };
+    }
+
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
       );
       if (response.ok) {
         const data = await response.json();
-        if (data.display_name) {
+        if (data && data.display_name) {
           return {
             address: data.display_name,
             error: null,
@@ -27,7 +31,7 @@ export const issueService = {
         }
       }
     } catch (err) {
-      console.warn('Nominatim reverse geocoding warning:', err);
+      console.warn('Nominatim reverse geocoding error:', err);
     }
 
     try {
@@ -53,8 +57,9 @@ export const issueService = {
       console.warn('BigDataCloud reverse geocoding warning:', err);
     }
 
+    // Graceful coordinate string fallback if network geocoding fails
     return {
-      address: `Location (${lat.toFixed(5)}, ${lon.toFixed(5)})`,
+      address: `Selected map location (${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)})`,
       error: null,
     };
   },
@@ -66,7 +71,9 @@ export const issueService = {
     if (!searchQuery || !searchQuery.trim()) return null;
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery.trim())}&limit=1`
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          searchQuery.trim()
+        )}&format=json&limit=5&addressdetails=1`
       );
       if (response.ok) {
         const data = await response.json();
@@ -190,35 +197,25 @@ export const issueService = {
     priority = 'Medium',
     imageUrl = null,
   }) {
-    let activeUserId = null;
-    let activeUserEmail = userEmail;
-    let activeUserName = userName;
+    // Verify session using supabase.auth.getSession()
+    const { data: { session } } = await supabase.auth.getSession();
+    const activeUser = session?.user;
 
-    // Dynamically retrieve authenticated user from supabase.auth.getUser()
-    try {
-      const { data: authUserData } = await supabase.auth.getUser();
-      if (authUserData?.user?.id) {
-        activeUserId = authUserData.user.id;
-        if (authUserData.user.email) activeUserEmail = authUserData.user.email;
-        const metaName =
-          authUserData.user.user_metadata?.full_name ||
-          authUserData.user.user_metadata?.name;
-        if (metaName) activeUserName = metaName;
-      }
-    } catch (authErr) {
-      console.warn('Could not fetch active user from supabase.auth.getUser():', authErr);
-    }
-
-    if (!activeUserId && isValidUuid(userId)) {
-      activeUserId = userId;
-    }
-
-    if (!activeUserId || !isValidUuid(activeUserId)) {
+    if (!activeUser || !activeUser.id) {
       return {
         data: null,
         error: new Error('Please log in with an authenticated account to submit a report.'),
       };
     }
+
+    const activeUserId = activeUser.id;
+    const activeUserEmail = activeUser.email || userEmail;
+    const activeUserName =
+      activeUser.user_metadata?.full_name ||
+      activeUser.user_metadata?.name ||
+      activeUser.email ||
+      userName ||
+      'Citizen User';
 
     try {
       // Step 1: Ensure user profile row exists in public.profiles table

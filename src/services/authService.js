@@ -1,35 +1,8 @@
 import { supabase } from './supabaseClient';
 
-const LOCAL_USER_KEY = 'civicpulse_local_user';
-
-function getStoredLocalUser() {
-  try {
-    const raw = localStorage.getItem(LOCAL_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function setStoredLocalUser(userObject) {
-  try {
-    localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObject));
-  } catch (e) {
-    console.warn('Error saving local user:', e);
-  }
-}
-
-function removeStoredLocalUser() {
-  try {
-    localStorage.removeItem(LOCAL_USER_KEY);
-  } catch (e) {
-    console.warn('Error removing local user:', e);
-  }
-}
-
 export const authService = {
   /**
-   * Register a new user with Email and Password (with mobile offline fallback)
+   * Register a new user with Email and Password using Supabase auth
    */
   async signUp({ email, password, fullName }) {
     try {
@@ -43,41 +16,15 @@ export const authService = {
         },
       });
 
-      if (!error && data?.user) {
-        return { data, user: data?.user, session: data?.session, error: null };
-      }
-
-      // If Supabase returned an error (e.g. invalid key or network issue), use fallback
-      if (error && (error.message?.includes('fetch') || error.status === 0 || error.name === 'AuthApiError')) {
-        console.warn('Supabase auth network error, activating local mobile session fallback:', error.message);
-        const fallbackUser = {
-          id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          email,
-          user_metadata: { full_name: fullName || email.split('@')[0] },
-          created_at: new Date().toISOString(),
-        };
-        const fallbackSession = { access_token: 'local_token', user: fallbackUser };
-        setStoredLocalUser(fallbackUser);
-        return { data: { user: fallbackUser, session: fallbackSession }, user: fallbackUser, session: fallbackSession, error: null };
-      }
-
-      return { data, user: data?.user, session: data?.session, error };
+      return { data, user: data?.user || null, session: data?.session || null, error };
     } catch (err) {
-      console.warn('Network exception during signUp, creating local mobile session:', err);
-      const fallbackUser = {
-        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        email,
-        user_metadata: { full_name: fullName || email.split('@')[0] },
-        created_at: new Date().toISOString(),
-      };
-      const fallbackSession = { access_token: 'local_token', user: fallbackUser };
-      setStoredLocalUser(fallbackUser);
-      return { data: { user: fallbackUser, session: fallbackSession }, user: fallbackUser, session: fallbackSession, error: null };
+      console.error('Exception during signUp:', err);
+      return { data: null, user: null, session: null, error: err };
     }
   },
 
   /**
-   * Log in an existing user with Email and Password (with mobile offline fallback)
+   * Log in an existing user with Email and Password using Supabase auth
    */
   async signIn({ email, password }) {
     try {
@@ -86,60 +33,28 @@ export const authService = {
         password,
       });
 
-      if (!error && data?.user) {
-        return { data, user: data?.user, session: data?.session, error: null };
-      }
-
-      // If network/key error occurs on mobile, fallback to local mobile session
-      if (error && (error.message?.includes('fetch') || error.status === 0 || error.name === 'AuthApiError')) {
-        console.warn('Supabase auth network error, activating local mobile session fallback:', error.message);
-        const stored = getStoredLocalUser();
-        const fallbackUser = stored && stored.email === email
-          ? stored
-          : {
-              id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-              email,
-              user_metadata: { full_name: email.split('@')[0] },
-              created_at: new Date().toISOString(),
-            };
-        const fallbackSession = { access_token: 'local_token', user: fallbackUser };
-        setStoredLocalUser(fallbackUser);
-        return { data: { user: fallbackUser, session: fallbackSession }, user: fallbackUser, session: fallbackSession, error: null };
-      }
-
-      return { data, user: data?.user, session: data?.session, error };
+      return { data, user: data?.user || null, session: data?.session || null, error };
     } catch (err) {
-      console.warn('Network exception during signIn, creating local mobile session:', err);
-      const stored = getStoredLocalUser();
-      const fallbackUser = stored && stored.email === email
-        ? stored
-        : {
-            id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-            email,
-            user_metadata: { full_name: email.split('@')[0] },
-            created_at: new Date().toISOString(),
-          };
-      const fallbackSession = { access_token: 'local_token', user: fallbackUser };
-      setStoredLocalUser(fallbackUser);
-      return { data: { user: fallbackUser, session: fallbackSession }, user: fallbackUser, session: fallbackSession, error: null };
+      console.error('Exception during signIn:', err);
+      return { data: null, user: null, session: null, error: err };
     }
   },
 
   /**
-   * Log out the current user session
+   * Log out the current user session using Supabase auth
    */
   async signOut() {
-    removeStoredLocalUser();
     try {
-      await supabase.auth.signOut();
-      return { error: null };
-    } catch {
-      return { error: null };
+      const { error } = await supabase.auth.signOut();
+      return { error: error || null };
+    } catch (err) {
+      console.error('Exception during signOut:', err);
+      return { error: err };
     }
   },
 
   /**
-   * Fetch current active session from Supabase or Local Storage
+   * Fetch current active session directly from Supabase auth
    */
   async getCurrentSession() {
     try {
@@ -147,17 +62,11 @@ export const authService = {
       if (!error && data?.session) {
         return { session: data.session, user: data.session.user, error: null };
       }
+      return { session: null, user: null, error: error || null };
     } catch (e) {
       console.warn('Supabase getSession network error:', e);
+      return { session: null, user: null, error: e };
     }
-
-    const localUser = getStoredLocalUser();
-    if (localUser) {
-      const localSession = { access_token: 'local_token', user: localUser };
-      return { session: localSession, user: localUser, error: null };
-    }
-
-    return { session: null, user: null, error: null };
   },
 
   /**
@@ -167,3 +76,4 @@ export const authService = {
     return supabase.auth.onAuthStateChange(callback);
   },
 };
+

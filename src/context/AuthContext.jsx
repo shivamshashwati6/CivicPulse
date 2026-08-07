@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../services/supabaseClient';
 import { authService } from '../services/authService';
 
 const AuthContext = createContext({
@@ -24,16 +25,18 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let mounted = true;
 
-    // Fetch initial auth session to persist login after refresh
+    // Initialize session directly using supabase.auth.getSession()
     const initAuth = async () => {
       try {
-        const { session: currentSession, user: currentUser } = await authService.getCurrentSession();
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.warn('Error fetching Supabase session:', error);
+        }
         if (mounted) {
           setSession(currentSession);
-          setUser(currentUser || currentSession?.user || null);
+          setUser(currentSession?.user || null);
 
-          // Check if current user is an admin
-          if (currentUser?.email?.includes('admin')) {
+          if (currentSession?.user?.email?.includes('admin')) {
             setIsAdmin(true);
             sessionStorage.setItem('civicpulse_is_admin', 'true');
           }
@@ -49,8 +52,8 @@ export const AuthProvider = ({ children }) => {
 
     initAuth();
 
-    // Subscribe to auth state changes
-    const { data: authListener } = authService.onAuthStateChange((_event, currentSession) => {
+    // Listen for authentication changes using supabase.auth.onAuthStateChange
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       if (mounted) {
         setSession(currentSession);
         setUser(currentSession?.user || null);

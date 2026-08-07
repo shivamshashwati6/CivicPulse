@@ -22,8 +22,18 @@ import { useToast } from '../../hooks/useToast';
 
 import { supabase } from '../../services/supabaseClient';
 
+function formatConfidencePercentage(val) {
+  if (val === null || val === undefined) return '85%';
+  const num = Number(val);
+  if (isNaN(num)) return '85%';
+  if (num <= 1) {
+    return `${Math.round(num * 100)}%`;
+  }
+  return `${Math.round(num)}%`;
+}
+
 export function ReportPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -35,11 +45,13 @@ export function ReportPage() {
   const [severity, setSeverity] = useState('Medium');
   const [description, setDescription] = useState('');
 
-  // Location State
+  // Location State (Initial state unconfirmed - NO hardcoded defaults)
   const [locationData, setLocationData] = useState({
-    address: 'New Delhi, India',
-    latitude: 28.6139,
-    longitude: 77.2090,
+    address: '',
+    latitude: null,
+    longitude: null,
+    locationSelected: false,
+    accuracy: null,
   });
 
   // Image Upload & AI State
@@ -105,24 +117,46 @@ export function ReportPage() {
     e.preventDefault();
     if (isSubmitting) return;
 
+    if (authLoading) {
+      toast.info('Restoring authentication session... Please try submitting again in a moment.');
+      return;
+    }
+
     if (!title.trim() || !description.trim()) {
       toast.error('Please enter an issue title and description.');
       return;
     }
 
-    // Dynamically retrieve authenticated user session from Supabase
-    let activeUser = user;
+    if (
+      !locationData.locationSelected ||
+      locationData.latitude === null ||
+      locationData.latitude === undefined ||
+      locationData.longitude === null ||
+      locationData.longitude === undefined ||
+      !locationData.address ||
+      !locationData.address.trim()
+    ) {
+      toast.error('Please select a valid location on the map before submitting.');
+      return;
+    }
+
+    // Verify actual Supabase authentication session as single source of truth
+    let activeUser = null;
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user?.id) {
-        activeUser = authData.user;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        activeUser = session.user;
       }
     } catch (authErr) {
-      console.warn('Could not fetch active user from supabase.auth.getUser():', authErr);
+      console.warn('Could not fetch session from supabase.auth.getSession():', authErr);
+    }
+
+    if (!activeUser && user?.id) {
+      activeUser = user;
     }
 
     if (!activeUser || !activeUser.id) {
-      toast.error('Please log in to submit a complaint.');
+      toast.error('Please log in with an authenticated account to submit a report.');
       navigate('/login');
       return;
     }
@@ -137,7 +171,13 @@ export function ReportPage() {
         uploadedImageUrl = uploadRes.publicUrl || null;
       }
 
-      // 2. Create Issue Record via issueService (safe schema handling)
+      // 2. Create Issue Record via issueService (verifies active session)
+      console.log("REPORT LOCATION:", {
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        address: locationData.address,
+      });
+
       const { data: createdIssue, error } = await issueService.createIssue({
         userId: activeUser.id,
         userEmail: activeUser.email || '',
@@ -246,7 +286,7 @@ export function ReportPage() {
                       <Sparkles className="w-4 h-4" /> AI Auto-Detected Details
                     </span>
                     <span className="text-slate-500 dark:text-slate-400 font-mono">
-                      Confidence: {Math.round((aiAnalysisResult.confidence || 0.85) * 100)}%
+                      Confidence: {formatConfidencePercentage(aiAnalysisResult.confidence)}
                     </span>
                   </div>
                   <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed italic">
@@ -280,6 +320,7 @@ export function ReportPage() {
             latitude={locationData.latitude}
             longitude={locationData.longitude}
             address={locationData.address}
+            locationSelected={locationData.locationSelected}
             onChange={(loc) => setLocationData(loc)}
             onLocationSelect={(loc) => setLocationData(loc)}
           />

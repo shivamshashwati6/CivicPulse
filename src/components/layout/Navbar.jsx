@@ -18,12 +18,12 @@ export function Navbar() {
 
   // Strict Role & View Isolation
   const isAdminView = currentPath.startsWith('/admin') || isAdmin === true;
-  const isAuthenticated = (user !== null && user?.id !== undefined) || isAdmin === true;
+  const isAuthenticated = Boolean(user && user.id) || isAdmin === true;
   const isCitizen = isAuthenticated && !isAdminView;
 
   const displayName = isAdminView
     ? (user?.email || user?.user_metadata?.full_name || 'Municipal Admin')
-    : (user?.user_metadata?.full_name || user?.email || 'Shashwati Shivam');
+    : (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Citizen User');
 
   const toggleMenu = () => setIsOpen(!isOpen);
 

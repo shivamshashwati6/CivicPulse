@@ -21,14 +21,14 @@ export function DashboardPage() {
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
     try {
-      // Safely resolve active user session ID
+      // Safely resolve active user session ID using Supabase getSession
       let currentUserId = user?.id;
       if (!currentUserId) {
         try {
-          const { data: authData } = await supabase.auth.getUser();
-          currentUserId = authData?.user?.id;
+          const { data: { session } } = await supabase.auth.getSession();
+          currentUserId = session?.user?.id;
         } catch (e) {
-          console.warn('Dashboard auth user fetch notice:', e);
+          console.warn('Dashboard auth session fetch notice:', e);
         }
       }
 
