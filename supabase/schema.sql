@@ -1,5 +1,5 @@
 -- ============================================================================
--- CivicPulse AI - Complete Database Schema & PostGIS Duplicate Merge Migration
+-- CivicPulse - Complete Database Schema & PostGIS Duplicate Merge Migration
 -- ============================================================================
 
 -- 1. Enable Required Extensions

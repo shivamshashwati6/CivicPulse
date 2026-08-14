@@ -1,8 +1,8 @@
-# CivicPulse AI
+# CivicPulse
 
 > AI-Powered Civic Issue Reporting & Management Platform
 
-CivicPulse AI is a modern full-stack web application designed for citizens to report public infrastructure issues (such as potholes, broken streetlights, illegal garbage dumping, water leakage, and damaged roads) by capturing/uploading photos. The platform utilizes AI vision triage (powered by Google Gemini API) to classify, rate severity, and route reports to municipal administrative teams.
+CivicPulse is a modern full-stack web application designed for citizens to report public infrastructure issues (such as potholes, broken streetlights, illegal garbage dumping, water leakage, and damaged roads) by capturing/uploading photos. The platform utilizes AI vision triage (powered by Google Gemini API) to classify, rate severity, and route reports to municipal administrative teams.
 
 ---
 

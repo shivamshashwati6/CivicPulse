@@ -73,7 +73,7 @@ export function Navbar() {
               <Activity className="w-5 h-5" />
             </div>
             <span className="text-lg font-bold tracking-tight text-slate-900 dark:bg-gradient-to-r dark:from-white dark:via-slate-100 dark:to-slate-300 dark:bg-clip-text dark:text-transparent">
-              Civic<span className="text-blue-600 dark:text-blue-400">Pulse AI</span>
+              Civic<span className="text-blue-600 dark:text-blue-400">Pulse</span>
             </span>
           </Link>
 

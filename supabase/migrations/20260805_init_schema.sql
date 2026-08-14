@@ -1,5 +1,5 @@
 -- ============================================================================
--- CivicPulse AI - Complete Database Schema & Fail-Proof RLS Policies Migration
+-- CivicPulse - Complete Database Schema & Fail-Proof RLS Policies Migration
 -- ============================================================================
 
 -- Enable UUID extension

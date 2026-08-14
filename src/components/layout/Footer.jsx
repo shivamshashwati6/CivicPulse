@@ -15,7 +15,7 @@ export function Footer() {
                 <Activity className="w-6 h-6" />
               </div>
               <span className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-                Civic<span className="text-blue-600 dark:text-blue-400">Pulse AI</span>
+                Civic<span className="text-blue-600 dark:text-blue-400">Pulse</span>
               </span>
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm">
@@ -88,7 +88,7 @@ export function Footer() {
 
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs gap-4 text-slate-500 dark:text-slate-400">
-          <p>© {new Date().getFullYear()} CivicPulse AI. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} CivicPulse. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <span className="hover:text-slate-800 dark:hover:text-white cursor-pointer transition-colors">Privacy Policy</span>
             <span className="hover:text-slate-800 dark:hover:text-white cursor-pointer transition-colors">Terms of Service</span>

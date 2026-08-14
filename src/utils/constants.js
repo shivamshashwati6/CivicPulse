@@ -1,6 +1,6 @@
-// CivicPulse AI Constants
+// CivicPulse Constants
 
-export const APP_NAME = "CivicPulse AI";
+export const APP_NAME = "CivicPulse";
 export const APP_TAGLINE = "AI-Powered Civic Issue Reporting & Management Platform";
 
 export const ISSUE_CATEGORIES = [

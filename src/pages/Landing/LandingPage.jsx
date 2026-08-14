@@ -150,21 +150,6 @@ export function LandingPage() {
                 </Link>
               </div>
 
-              {/* Trust Badge Bar */}
-              <div className="pt-6 border-t border-slate-200/80 dark:border-slate-800/80 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span>Google Gemini Vision AI</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span>Supabase Backend</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span>OpenStreetMap GIS Ready</span>
-                </div>
-              </div>
             </div>
 
             {/* Right Column Phone Mockup */}
@@ -203,7 +188,7 @@ export function LandingPage() {
             Engineered for High-Impact Municipal Efficiency
           </h2>
           <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed">
-            From automated AI triage to OpenStreetMap GIS map visualization, CivicPulse AI streamlines the complete lifecycle of municipal maintenance.
+            From automated AI triage to OpenStreetMap GIS map visualization, CivicPulse streamlines the complete lifecycle of municipal maintenance.
           </p>
         </div>
 
@@ -231,7 +216,7 @@ export function LandingPage() {
             <span>Simple 4-Step Workflow</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
-            How CivicPulse AI Resolves Infrastructure Issues
+            How CivicPulse Resolves Infrastructure Issues
           </h2>
         </div>
 
@@ -263,10 +248,10 @@ export function LandingPage() {
                 <span>Municipal Relations</span>
               </div>
               <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-                Deploy CivicPulse AI in Your Municipality
+                Deploy CivicPulse in Your Municipality
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                Interested in deploying CivicPulse AI for your city or public works department? Contact our team for institutional onboarding.
+                Interested in deploying CivicPulse for your city or public works department? Contact our team for institutional onboarding.
               </p>
             </div>
 

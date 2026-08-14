@@ -21,7 +21,7 @@ export function PhoneMockup() {
               <div className="w-6 h-6 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-[10px]">
                 CP
               </div>
-              <span className="font-bold text-gray-900 text-xs">CivicPulse AI</span>
+              <span className="font-bold text-gray-900 text-xs">CivicPulse</span>
             </div>
             <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-semibold text-[10px] border border-emerald-100 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live System
