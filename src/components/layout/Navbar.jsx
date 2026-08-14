@@ -62,10 +62,10 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 px-4 sm:px-6 lg:px-8">
-      {/* Cyber-Tactical Pill-Shaped Glass Header */}
-      <div className="backdrop-blur-md bg-white/70 dark:bg-[#0f172a]/60 border border-slate-200/80 dark:border-slate-800/80 rounded-full my-3 mx-auto max-w-7xl px-6 shadow-lg shadow-slate-900/5 dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] transition-all duration-300">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-4 z-50 px-4 sm:px-6 lg:px-8">
+      {/* Floating Pill Glass Header */}
+      <div className="max-w-7xl mx-auto px-6 py-3 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-sm transition-all duration-300">
+        <div className="flex items-center justify-between">
           
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group hover:scale-[1.02] transition-transform">

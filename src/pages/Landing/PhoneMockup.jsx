@@ -5,7 +5,7 @@ export function PhoneMockup() {
   return (
     <div className="relative mx-auto w-full max-w-[320px] sm:max-w-[340px]">
       {/* Outer Phone Frame */}
-      <div className="relative rounded-[40px] bg-gray-900 p-3 shadow-2xl shadow-blue-900/20 border-4 border-gray-800">
+      <div className="relative rounded-3xl bg-gray-900 p-3 shadow-xl border border-slate-200 dark:border-slate-800">
         
         {/* Notch / Speaker Bar */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 h-5 w-36 bg-gray-900 rounded-b-2xl z-20 flex items-center justify-center">
@@ -13,7 +13,7 @@ export function PhoneMockup() {
         </div>
 
         {/* Screen Content */}
-        <div className="relative rounded-[32px] bg-white overflow-hidden border border-gray-100 font-sans text-xs text-gray-900 pt-6 pb-4 px-3.5 space-y-3">
+        <div className="relative rounded-2xl bg-white overflow-hidden border border-gray-100 font-sans text-xs text-gray-900 pt-6 pb-4 px-3.5 space-y-3">
           
           {/* App Header */}
           <div className="flex items-center justify-between pb-2 border-b border-gray-100 pt-1">

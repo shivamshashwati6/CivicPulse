@@ -87,12 +87,12 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs gap-4 text-slate-500 dark:text-slate-400">
+        <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
           <p>© {new Date().getFullYear()} CivicPulse. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-            <span className="hover:text-slate-800 dark:hover:text-white cursor-pointer transition-colors">Privacy Policy</span>
-            <span className="hover:text-slate-800 dark:hover:text-white cursor-pointer transition-colors">Terms of Service</span>
-            <span className="hover:text-slate-800 dark:hover:text-white cursor-pointer transition-colors">Security Overview</span>
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6">
+            <span className="hover:text-slate-800 dark:hover:text-white cursor-pointer transition-colors whitespace-nowrap">Privacy Policy</span>
+            <span className="hover:text-slate-800 dark:hover:text-white cursor-pointer transition-colors whitespace-nowrap">Terms of Service</span>
+            <span className="hover:text-slate-800 dark:hover:text-white cursor-pointer transition-colors whitespace-nowrap">Security</span>
           </div>
         </div>
       </div>

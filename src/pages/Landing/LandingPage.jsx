@@ -20,7 +20,7 @@ import {
   PlusCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { PhoneMockup } from './PhoneMockup';
+import heroArchitecture from '../../assets/hero_architecture.jpg';
 
 export function LandingPage() {
   const [contactForm, setContactForm] = useState({
@@ -152,9 +152,15 @@ export function LandingPage() {
 
             </div>
 
-            {/* Right Column Phone Mockup */}
+            {/* Right Column Product Architecture Graphic */}
             <div className="lg:col-span-5 flex justify-center lg:justify-end">
-              <PhoneMockup />
+              <div className="relative w-full max-w-[500px] lg:max-w-none rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-900/5 dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transition-all duration-300">
+                <img
+                  src={heroArchitecture}
+                  alt="CivicPulse Architecture - AI Triage Engine, GIS Mapping Network & Real-Time Database Schema"
+                  className="w-full h-auto object-cover rounded-3xl"
+                />
+              </div>
             </div>
 
           </div>
@@ -196,7 +202,7 @@ export function LandingPage() {
           {features.map((feature, i) => (
             <div
               key={i}
-              className="p-8 bg-white/80 dark:bg-slate-900/60 dark:backdrop-blur-xl rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] hover:dark:border-blue-500/40 hover:dark:shadow-[0_0_20px_rgba(59,130,246,0.15)] transition-all duration-300 space-y-4"
+              className="p-6 bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 rounded-2xl space-y-4"
             >
               <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-500/30">
                 <feature.icon className="w-6 h-6" />
